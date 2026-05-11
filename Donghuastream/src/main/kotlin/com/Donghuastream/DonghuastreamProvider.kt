@@ -10,9 +10,7 @@ import android.content.Context
 class DonghuastreamProvider: Plugin() {
     override fun load(context: Context) {
         Donghuastream.context = context
-        SeaTV.context = context
         registerMainAPI(Donghuastream())
-        registerMainAPI(SeaTV())
         registerExtractorAPI(Vtbe())
         registerExtractorAPI(waaw())
         registerExtractorAPI(wishfast())
