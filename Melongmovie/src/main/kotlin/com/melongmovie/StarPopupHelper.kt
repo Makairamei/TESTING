@@ -1,4 +1,4 @@
-package com.layarKacaProvider
+package com.melongmovie
 
 import android.app.Activity
 import android.app.AlertDialog
