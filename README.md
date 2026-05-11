@@ -21,7 +21,7 @@ Repository ini berisi kumpulan extension provider untuk Cloudstream (CS3). Semua
 3. Pilih Extensions / Repository
 4. Tambahkan URL berikut:
 
-https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/builds/plugins.json
+https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/master/repo.json
 
 5. Restart aplikasi
 6. Extension akan otomatis muncul
