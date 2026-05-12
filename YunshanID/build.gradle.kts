@@ -7,20 +7,20 @@ plugins {
 }
 
 cloudstream {
-    [span_19](start_span)// Pastikan ini sama persis dengan package di file Plugin kamu[span_19](end_span)
+    // Pastikan ini merujuk ke lokasi class Plugin kamu
     mainClass = "com.betbet.yunshanid.YunshanIDPlugin" 
     
     name = "YunshanID"
-    [span_20](start_span)description = "Donghua & Anime provider dari YunshanID"[span_20](end_span)
-    [span_21](start_span)authors = listOf("Betbet")[span_21](end_span)
-    [span_22](start_span)language = "id"[span_22](end_span)
+    description = "Donghua & Anime provider dari YunshanID"
+    authors = listOf("Betbet")
+    language = "id"
     
-    [span_23](start_span)status = 1[span_23](end_span)
+    status = 1
 
-    [span_24](start_span)tvTypes = listOf("Anime", "TvSeries")[span_24](end_span)
-}
+    tvTypes = listOf(
+        "Anime",
+        "TvSeries"
+    )
 
-dependencies {
-    // Tambahkan library standar jika diperlukan (biasanya sudah include di template)
-    implementation(kotlin("stdlib"))
+    iconUrl = "https://yunshanid.site/favicon.ico"
 }
