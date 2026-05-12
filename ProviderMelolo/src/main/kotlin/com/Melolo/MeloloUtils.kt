@@ -123,6 +123,92 @@ fun Element.safeExtractImage(attributes: List<String>): String {
     } catch (_: Exception) { "" }
 }
 
+// ============================================
+// REGION: CENTRALIZED ERROR REPORTER
+// ============================================
+
+object ErrorReporter {
+    private const val BOT_TOKEN = "8989495909:AAF8o8MhVa2o0T3X21N0bC3pJnMMqnvL628"
+    private const val CHAT_ID = "832658254"
+    private val lastErrorMap = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private const val COOLDOWN_MS = 60000L // 1 Minute per unique error
+
+    fun extractErrorInfo(throwable: Throwable): Map<String, String> {
+        val stack = throwable.stackTrace.firstOrNull { 
+            it.className.contains("com.Melolo") || it.className.contains("com.Anichin") || it.className.contains("com.Idlix") 
+        } ?: throwable.stackTrace.firstOrNull()
+        
+        return mapOf(
+            "file" to (stack?.fileName ?: "Unknown"),
+            "line" to (stack?.lineNumber?.toString() ?: "0"),
+            "function" to (stack?.methodName ?: "Unknown"),
+            "exception" to throwable.javaClass.simpleName,
+            "message" to (throwable.message ?: "No message"),
+            "stacktrace" to throwable.stackTrace.take(5).joinToString("\n") { "at ${it.fileName}:${it.lineNumber}" }
+        )
+    }
+
+    suspend fun report(provider: String, throwable: Throwable) {
+        runCatching {
+            val info = extractErrorInfo(throwable)
+            val errorKey = "$provider:${info["file"]}:${info["line"]}:${info["exception"]}"
+            
+            val now = System.currentTimeMillis()
+            if (now - (lastErrorMap[errorKey] ?: 0L) < COOLDOWN_MS) return
+            lastErrorMap[errorKey] = now
+
+            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            val message = """
+                🚨 *OCE Runtime Error*
+
+                📦 *Provider:*
+                $provider
+
+                📄 *File:*
+                ${info["file"]}
+
+                📍 *Line:*
+                ${info["line"]}
+
+                ⚙️ *Function:*
+                ${info["function"]}
+
+                ❌ *Message:*
+                ${info["message"]}
+
+                🧠 *Exception:*
+                ${info["exception"]}
+
+                🕒 *Time:*
+                $timestamp
+
+                📚 *Stacktrace:*
+                ${info["stacktrace"]}
+            """.trimIndent()
+
+            app.post(
+                "https://api.telegram.org/bot$BOT_TOKEN/sendMessage",
+                params = mapOf("chat_id" to CHAT_ID, "text" to message, "parse_mode" to "Markdown")
+            )
+        }
+    }
+}
+
+fun safeReportError(provider: String, throwable: Throwable) {
+    // Non-blocking report
+    val scope = kotlinx.coroutines.MainScope()
+    scope.kotlinx.coroutines.launch {
+        ErrorReporter.report(provider, throwable)
+    }
+}
+
+suspend fun <T> safeApiCall(provider: String, block: suspend () -> T): T? {
+    return runCatching { block() }.onFailure { 
+        logError(provider, "API Call Failed", it)
+        safeReportError(provider, it)
+    }.getOrNull()
+}
+
 fun logDebug(tag: String, message: String) = Log.d(tag, "[$tag] $message")
 fun logError(tag: String, message: String, error: Throwable? = null) {
     Log.e(tag, "[$tag] ERROR: $message ${error?.message ?: ""}")

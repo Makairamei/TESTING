@@ -136,10 +136,12 @@ object MeloloAPI {
         
         streams.forEach { s ->
             val sUrl = s.url!!
-            val isM3u8 = sUrl.contains(".m3u8") || sUrl.contains("master")
+            // Aliyun Private Encryption segments are actually HLS-compatible segments
+            val isM3u8 = sUrl.contains(".m3u8") || sUrl.contains("master") || sUrl.contains(".encrypt.mp4")
             callback(newExtractorLink(provider.name, "DramaBox ${s.quality?.let { "${it}p" } ?: "Auto"}", sUrl, if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO) {
                 this.quality = s.quality ?: Qualities.Unknown.value
                 this.referer = "${provider.mainUrl}/"
+                this.headers = mapOf("Referer" to "${provider.mainUrl}/")
             })
         }
         return streams.isNotEmpty()

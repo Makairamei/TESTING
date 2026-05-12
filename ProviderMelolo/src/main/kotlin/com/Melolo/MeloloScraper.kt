@@ -182,14 +182,14 @@ object MeloloScraper {
             val attrValueSelectors = provider.getCachedList(Constants.ATTR_VALUE)
             val allPossibleLinks = mutableSetOf<Pair<String, String?>>()
 
-            // AGGRESSIVE GATHERING (STABLE V2.2.0 Pattern + Next.js Resilience)
+            // AGGRESSIVE GATHERING (STABLE V2.2.0 Pattern + Modern Mirror Discovery)
             document.select("script").forEach { script ->
-                val data = script.data()
-                if (data.contains("__next_f.push")) {
-                    CompiledRegexPatterns.extractAllVideoUrls(data).forEach { allPossibleLinks.add(it to "NextJS") }
-                    // Special search for player domains like majorplay
-                    Regex("""https?://[^\s"']*(?:majorplay|player)[^\s"']*""").findAll(data).forEach { 
-                        allPossibleLinks.add(it.value.replace("\\/", "/") to "MajorPlay") 
+                val scriptData = script.data()
+                if (scriptData.contains("__next_f.push") || scriptData.contains("firstStreamingUrl") || scriptData.contains("majorplay")) {
+                    CompiledRegexPatterns.extractAllVideoUrls(scriptData).forEach { allPossibleLinks.add(it to "Mirror") }
+                    // Special search for player domains
+                    Regex("""https?://[^\s"']*(?:majorplay|player|youlike|embed|mirror)[^\s"']*""").findAll(scriptData).forEach { 
+                        allPossibleLinks.add(it.value.replace("\\/", "/") to "Player") 
                     }
                 }
             }
