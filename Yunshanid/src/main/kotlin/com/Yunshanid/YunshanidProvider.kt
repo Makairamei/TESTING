@@ -3,7 +3,7 @@ package Yunshanid
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
-import org.jsoup.Jsoup // Tambahkan ini supaya bisa parse manual
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.Collections
 import kotlinx.coroutines.async
@@ -24,6 +24,7 @@ class YunshanidProvider : MainAPI() {
         "category/movie/page/%d/" to "Bioskop",
         "category/tv-series/page/%d/" to "TV Series",
         "category/anime/page/%d/" to "Anime",
+        "category/donghua/page/%d/" to "Donghua",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -33,7 +34,7 @@ class YunshanidProvider : MainAPI() {
             request.data.format(page)
         }
 
-        // Pakai Jsoup.parse(app.get(...).text) supaya 100% aman dari error "Unresolved Document"
+        // Pakai Jsoup.parse manual biar gak ada drama "Unresolved reference: document"
         val response = app.get("$mainUrl/$path").text
         val document = Jsoup.parse(response)
         
@@ -49,7 +50,7 @@ class YunshanidProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst(".tt, h2")?.text()?.trim() ?: return null
-        // Gunakan this@YunshanidProvider.fixUrl agar konteksnya jelas
+        // Panggil fixUrl dari instance Provider secara eksplisit
         val href = this@YunshanidProvider.fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
         val poster = this.selectFirst("img")?.attr("src")
         
