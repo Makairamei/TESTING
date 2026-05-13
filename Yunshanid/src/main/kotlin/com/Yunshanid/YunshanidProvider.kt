@@ -3,6 +3,7 @@ package Yunshanid
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import org.jsoup.Jsoup // Tambahkan ini supaya bisa parse manual
 import org.jsoup.nodes.Element
 import java.util.Collections
 import kotlinx.coroutines.async
@@ -18,13 +19,11 @@ class YunshanidProvider : MainAPI() {
     override val hasDownloadSupport = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
 
-    // Kategori Halaman Utama (Bisa kamu tambah sesuai menu di webnya)
     override val mainPage = mainPageOf(
         "" to "Update Terbaru",
         "category/movie/page/%d/" to "Bioskop",
         "category/tv-series/page/%d/" to "TV Series",
         "category/anime/page/%d/" to "Anime",
-        "category/donghua/page/%d/" to "Donghua",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -34,7 +33,10 @@ class YunshanidProvider : MainAPI() {
             request.data.format(page)
         }
 
-        val document = app.get("$mainUrl/$path").document
+        // Pakai Jsoup.parse(app.get(...).text) supaya 100% aman dari error "Unresolved Document"
+        val response = app.get("$mainUrl/$path").text
+        val document = Jsoup.parse(response)
+        
         val homeList = document.select("article, .bs")
             .mapNotNull { it.toSearchResult() }
             .distinctBy { it.url }
@@ -47,10 +49,10 @@ class YunshanidProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst(".tt, h2")?.text()?.trim() ?: return null
-        val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
+        // Gunakan this@YunshanidProvider.fixUrl agar konteksnya jelas
+        val href = this@YunshanidProvider.fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
         val poster = this.selectFirst("img")?.attr("src")
         
-        // Deteksi tipe otomatis dari label di poster
         val typeLabel = this.select(".type").text().lowercase()
         val type = when {
             typeLabel.contains("tv") || typeLabel.contains("series") -> TvType.TvSeries
@@ -66,13 +68,14 @@ class YunshanidProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        return app.get("$mainUrl/?s=$query").document
-            .select("article, .bs")
+        val response = app.get("$mainUrl/?s=$query").text
+        val document = Jsoup.parse(response)
+        
+        return document.select("article, .bs")
             .mapNotNull { it.toSearchResult() }
             .distinctBy { it.url }
     }
 
-    // Fungsi pembersih judul ala Winbu
     private fun cleanupTitle(rawTitle: String): String {
         return rawTitle
             .replace(Regex("^(Nonton\\s+|Download\\s+)", RegexOption.IGNORE_CASE), "")
@@ -81,14 +84,14 @@ class YunshanidProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+        val response = app.get(url).text
+        val document = Jsoup.parse(response)
         
         val rawTitle = document.selectFirst("h1.entry-title")?.text() ?: "No Title"
         val title = cleanupTitle(rawTitle)
         val poster = document.selectFirst(".poster img, .thumb img")?.attr("src")
         val plot = document.selectFirst(".entry-content p, .synopsis p")?.text()
         
-        // Menarik metadata tambahan: Rating & Tags
         val rating = document.selectFirst(".rating strong, .imdb-rating")?.text()?.toDoubleOrNull()
         val tags = document.select(".genredesc a, .genre a").map { it.text().trim() }
 
@@ -96,10 +99,9 @@ class YunshanidProvider : MainAPI() {
             .mapNotNull { it.toSearchResult() }
             .filterNot { it.url == url }
 
-        // List Episode
         val episodes = document.select(".eplister li, .list-episode li").mapNotNull {
             val epName = it.select(".ep-num, .epl-num").text() ?: "Episode"
-            val epHref = fixUrl(it.select("a").attr("href") ?: return@mapNotNull null)
+            val epHref = this@YunshanidProvider.fixUrl(it.select("a").attr("href") ?: return@mapNotNull null)
             val date = it.select(".epl-date, .date").text()
             Episode(epHref, epName, date = date)
         }
@@ -129,12 +131,12 @@ class YunshanidProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data).document
+        val response = app.get(data).text
+        val document = Jsoup.parse(response)
         var found = false
         val seen = Collections.synchronizedSet(hashSetOf<String>())
 
         coroutineScope {
-            // Ambil semua sumber (Iframe, Dropdown, Tab) secara paralel
             val players = document.select("iframe, .mirror-option option, .nav-tabs li a")
             
             players.map { element ->
