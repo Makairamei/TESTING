@@ -1,4 +1,4 @@
-package Yunshanid
+package Yunshanid // Pakai huruf kecil 'package' agar tidak error
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -18,9 +18,11 @@ class YunshanidProvider : MainAPI() {
         TvType.Anime
     )
 
+    // Header stabil untuk nembus 403
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Android 10) AppleWebKit/537.36 Chrome/124.0",
-        "Referer" to "$mainUrl/"
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Referer" to "$mainUrl/",
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     )
 
     // ---------------- MAIN PAGE ----------------
@@ -80,16 +82,19 @@ class YunshanidProvider : MainAPI() {
 
             val type = when {
                 typeText.contains("tv") -> TvType.TvSeries
-                typeText.contains("anime") -> TvType.Anime
+                typeText.contains("anime") || typeText.contains("donghua") -> TvType.Anime
                 else -> TvType.Movie
             }
 
+            // Gunakan this@YunshanidProvider.fixUrl agar tidak unresolved reference
+            val finalUrl = this@YunshanidProvider.fixUrl(url)
+
             if (type == TvType.Movie) {
-                newMovieSearchResponse(title, fixUrl(url)) {
+                newMovieSearchResponse(title, finalUrl) {
                     this.posterUrl = poster
                 }
             } else {
-                newAnimeSearchResponse(title, fixUrl(url), type) {
+                newAnimeSearchResponse(title, finalUrl, type) {
                     this.posterUrl = poster
                 }
             }
@@ -108,11 +113,8 @@ class YunshanidProvider : MainAPI() {
             ?: "Unknown"
 
         val poster = doc.selectFirst(".poster img, .thumb img")?.attr("src")
-
-        val plot = doc.selectFirst(".entry-content p")?.text()
-
-        val tags = doc.select(".genre a")
-            .map { it.text() }
+        val plot = doc.selectFirst(".entry-content p, .synopsis p")?.text()
+        val tags = doc.select(".genre a, .genredesc a").map { it.text().trim() }
 
         val episodes = doc.select(".eplister li, .list-episode li")
             .mapIndexedNotNull { index, el ->
@@ -120,11 +122,12 @@ class YunshanidProvider : MainAPI() {
                 val epUrl = el.selectFirst("a")?.attr("href")
                     ?: return@mapIndexedNotNull null
 
-                val epName = el.text().ifBlank {
+                val epName = el.select(".ep-num, .epl-num").text().ifBlank {
                     "Episode ${index + 1}"
                 }
 
-                newEpisode(fixUrl(epUrl)) {
+                // Gunakan this@YunshanidProvider.fixUrl
+                newEpisode(this@YunshanidProvider.fixUrl(epUrl)) {
                     this.name = epName
                     this.episode = index + 1
                 }
@@ -156,39 +159,30 @@ class YunshanidProvider : MainAPI() {
 
         return try {
             val doc = app.get(data, headers = headers).document
-
             val seen = hashSetOf<String>()
             var found = false
 
+            // Selector lebih luas untuk menangkap tombol server
             val elements = doc.select(
-                "iframe, video source, a[href], .btn-download, .mirror-option option"
+                "iframe, video source, a[href], .btn-download, .mirror-option option, .nav-tabs li a"
             )
 
             elements.forEach { el ->
-
                 val src = when {
-                    el.tagName() == "iframe" -> el.attr("src")
+                    el.tagName() == "iframe" -> el.attr("src") ?: el.attr("data-src")
                     el.tagName() == "source" -> el.attr("src")
                     el.tagName() == "option" -> el.attr("value")
+                    el.tagName() == "a" && el.hasAttr("data-embed") -> el.attr("data-embed")
                     else -> el.attr("href")
                 }
 
-                if (!src.isNullOrBlank() &&
-                    src.startsWith("http") &&
-                    seen.add(src)
-                ) {
+                if (!src.isNullOrBlank() && src.startsWith("http") && seen.add(src)) {
                     runCatching {
-                        loadExtractor(
-                            src,
-                            data,
-                            subtitleCallback,
-                            callback
-                        )
+                        loadExtractor(src, data, subtitleCallback, callback)
                         found = true
                     }
                 }
             }
-
             found
         } catch (e: Exception) {
             false
