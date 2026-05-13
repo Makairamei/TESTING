@@ -1,22 +1,15 @@
 version = 1
 
 cloudstream {
-
     language = "id"
-
-    authors = listOf(
-        "Betbet"
-    )
-
-    description =
-        "Yunshanid Donghua Extension"
-
+    description = "Yunshanid — Streaming Movie, TV Series dan Anime Sub Indo"
+    authors = listOf("BetbetMiro")
     status = 1
-
     tvTypes = listOf(
-        "Anime"
+        "Movie",
+        "TvSeries",
+        "Anime",
     )
 
-    iconUrl =
-        "https://yunshanid.site/favicon.ico"
+    iconUrl = "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://yunshanid.site&size=%size%"
 }
