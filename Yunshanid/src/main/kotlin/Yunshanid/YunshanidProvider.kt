@@ -7,10 +7,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 class YunshanidProvider : MainAPI() {
 
-    override var mainUrl = "https://yunshanid.site"
     override var name = "Yunshanid"
-    override val hasMainPage = true
+    override var mainUrl = "https://yunshanid.site"
     override var lang = "id"
+    override val hasMainPage = true
     override val hasQuickSearch = true
     override val supportedTypes = setOf(
         TvType.Movie,
@@ -24,37 +24,39 @@ class YunshanidProvider : MainAPI() {
     )
 
     // -----------------------------
-    // GLOBAL GOD CACHE (SESSION SAFE)
+    // MIRROR SYSTEM (ASCENDED)
     // -----------------------------
-    private val cache = ConcurrentHashMap<String, String>()
+    private val mirrors = listOf(
+        "https://yunshanid.site",
+        "https://yunshanid.my.id",
+        "https://yunshanid.vip"
+    )
 
-    private fun getCached(url: String): String {
-        return cache[url] ?: app.get(url, headers = headers).text.also {
-            cache[url] = it
+    private fun tryMirrors(path: String): String? {
+        for (m in mirrors) {
+            try {
+                val doc = app.get("$m$path", headers = headers).document
+                if (doc.select("article, .post, .bs").isNotEmpty()) {
+                    return "$m$path"
+                }
+            } catch (_: Exception) {}
         }
+        return null
     }
 
     // -----------------------------
-    // SMART SELECTOR (SELF HEALING)
+    // SMART TEXT RESOLVER
     // -----------------------------
     private fun Element.smartText(vararg sel: String): String? {
-        for (s in sel) {
-            val t = selectFirst(s)?.text()
-            if (!t.isNullOrBlank()) return t
-        }
-        return null
+        return sel.firstNotNullOfOrNull { selectFirst(it)?.text()?.takeIf { t -> t.isNotBlank() } }
     }
 
     private fun Element.smartAttr(attr: String, vararg sel: String): String? {
-        for (s in sel) {
-            val v = selectFirst(s)?.attr(attr)
-            if (!v.isNullOrBlank()) return v
-        }
-        return null
+        return sel.firstNotNullOfOrNull { selectFirst(it)?.attr(attr)?.takeIf { v -> v.isNotBlank() } }
     }
 
     // -----------------------------
-    // MAIN PAGE (ADAPTIVE PARSER)
+    // MAIN PAGE
     // -----------------------------
     override val mainPage = mainPageOf(
         "" to "Update",
@@ -69,7 +71,9 @@ class YunshanidProvider : MainAPI() {
             request.data.replace("/page/%d/", "/")
         else request.data.format(page)
 
-        val doc = app.get("$mainUrl/$path", headers = headers).document
+        val realUrl = tryMirrors(path) ?: "$mainUrl/$path"
+
+        val doc = app.get(realUrl, headers = headers).document
 
         val items = doc.select("article, .bs, .post, .item, .grid-item")
             .mapNotNull { it.toSearchResult() }
@@ -83,15 +87,13 @@ class YunshanidProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
 
-        val title =
-            smartText(".tt", "h2", ".title", ".post-title", ".entry-title")
-                ?: return null
+        val title = smartText(".tt", "h2", ".title", ".post-title", ".entry-title")
+            ?: return null
 
         val url = fixUrl(selectFirst("a")?.attr("href") ?: return null)
 
-        val poster =
-            smartAttr("src", "img", ".thumb img", ".poster img")
-                ?: selectFirst("img")?.attr("data-src")
+        val poster = smartAttr("src", "img", ".thumb img", ".poster img")
+            ?: selectFirst("img")?.attr("data-src")
 
         return newMovieSearchResponse(title, url, TvType.Movie) {
             this.posterUrl = poster
@@ -99,37 +101,23 @@ class YunshanidProvider : MainAPI() {
     }
 
     // -----------------------------
-    // SEARCH (FLEXIBLE SCAN)
-    // -----------------------------
-    override suspend fun search(query: String): List<SearchResponse> {
-        return app.get("$mainUrl/?s=$query", headers = headers)
-            .document
-            .select("article, .bs, .post, .item, .grid-item")
-            .mapNotNull { it.toSearchResult() }
-            .distinctBy { it.url }
-    }
-
-    // -----------------------------
-    // LOAD (SELF-RECOVERY MODE)
+    // LOAD
     // -----------------------------
     override suspend fun load(url: String): LoadResponse {
 
         val doc = app.get(url, headers = headers).document
 
         val title =
-            doc.selectFirst("h1, .entry-title, .post-title")
-                ?.text()
+            doc.selectFirst("h1, .entry-title, .post-title")?.text()
                 ?: "No Title"
 
         val poster =
-            doc.selectFirst(".poster img, .thumb img, img")
-                ?.attr("src")
+            doc.selectFirst(".poster img, .thumb img, img")?.attr("src")
 
         val plot =
-            doc.selectFirst(".entry-content p, .synopsis, .desc")
-                ?.text()
+            doc.selectFirst(".entry-content p, .synopsis, .desc")?.text()
 
-        val episodes = doc.select(".eplister li a, .list-episode li a, .num-ep a")
+        val episodes = doc.select(".eplister li a, .list-episode li a")
             .mapIndexedNotNull { i, e ->
                 val epUrl = fixUrl(e.attr("href"))
                 val epName = e.text().ifBlank { "Episode ${i + 1}" }
@@ -154,7 +142,7 @@ class YunshanidProvider : MainAPI() {
     }
 
     // -----------------------------
-    // GOD MODE LOAD LINKS ENGINE
+    // ASCENDED LOAD LINKS ENGINE
     // -----------------------------
     override suspend fun loadLinks(
         data: String,
@@ -168,20 +156,28 @@ class YunshanidProvider : MainAPI() {
         val seen = hashSetOf<String>()
         var found = false
 
-        // heuristic filter (buang UI/noise links)
-        fun isValid(url: String): Boolean {
-            return url.startsWith("http") &&
-                    !url.contains("javascript") &&
-                    !url.contains("#") &&
-                    !url.contains("google")
+        // -------------------------
+        // URL CLEANER (ASCENDED)
+        // -------------------------
+        fun clean(url: String): String {
+            return url
+                .replace("\\s".toRegex(), "")
+                .replace(" ", "")
         }
 
-        fun runExtract(url: String) {
-            if (!isValid(url)) return
-            if (!seen.add(url)) return
+        fun valid(url: String): Boolean {
+            return url.startsWith("http") &&
+                    !url.contains("javascript") &&
+                    !url.contains("#")
+        }
+
+        fun extract(url: String, weight: Int = 1) {
+            val u = clean(url)
+            if (!valid(u)) return
+            if (!seen.add(u)) return
 
             runCatching {
-                loadExtractor(url, data, subtitleCallback) {
+                loadExtractor(u, data, subtitleCallback) {
                     found = true
                     callback(it)
                 }
@@ -201,14 +197,16 @@ class YunshanidProvider : MainAPI() {
                 .ifBlank { it.attr("value") }
                 .ifBlank { it.attr("href") }
 
-            if (url.contains("filemoon") ||
-                url.contains("streamwish") ||
-                url.contains("gofile") ||
-                url.contains("mp4upload") ||
-                url.contains("voe")
-            ) {
-                runExtract(url)
+            val score = when {
+                url.contains("filemoon") -> 3
+                url.contains("streamwish") -> 3
+                url.contains("voe") -> 2
+                url.contains("gofile") -> 2
+                url.contains("mp4upload") -> 2
+                else -> 1
             }
+
+            if (score >= 2) extract(url, score)
         }
 
         // -------------------------
@@ -220,7 +218,7 @@ class YunshanidProvider : MainAPI() {
                 .ifBlank { it.attr("value") }
                 .ifBlank { it.attr("href") }
 
-            runExtract(url)
+            extract(url)
         }
 
         return found
