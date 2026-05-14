@@ -10,7 +10,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URLEncoder
 
 class Melolo : MainAPI() {
-    // Ganti ke www.melolo.com karena api.tmthreader.com sering gagal resolve
+    // Gunakan domain melolo.com langsung karena api.tmthreader.com gagal resolve di HP kamu
     override var mainUrl = "https://www.melolo.com"
     override var name = "Melolo😶"
     override var lang = "id"
@@ -21,47 +21,9 @@ class Melolo : MainAPI() {
 
     private val aid = "645713"
     private val catalogBase = "https://melolo-api-azure.vercel.app/api/melolo"
-    private val browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-
-    override val mainPage = mainPageOf(
-        "latest" to "Terbaru",
-        "trending" to "Trending",
-        "q:ceo" to "CEO",
-        "q:romansa" to "Romansa",
-        "q:sistem" to "Sistem",
-        "q:keluarga" to "Keluarga",
-        "q:mafia" to "Mafia",
-        "q:aksi" to "Aksi",
-        "q:balas dendam" to "Balas Dendam",
-        "q:pernikahan" to "Pernikahan",
-        "q:drama periode" to "Drama Periode",
-    )
-
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val isSearchCategory = request.data.startsWith("q:", true)
-        if (page > 1 && !isSearchCategory) return newHomePageResponse(HomePageList(request.name, emptyList()), false)
-
-        val (books, hasNext) = if (isSearchCategory) {
-            fetchSearchPage(request.data.removePrefix("q:").trim(), limit = 20, offset = (page.coerceAtLeast(1) - 1) * 20)
-        } else {
-            (if (request.data == "trending") fetchTrending() else fetchLatest()) to false
-        }
-
-        val items = books.mapNotNull { b ->
-            newTvSeriesSearchResponse(b.book_name ?: return@mapNotNull null, "$mainUrl/series/${b.book_id ?: return@mapNotNull null}", TvType.TvSeries) {
-                this.posterUrl = b.thumb_url
-            }
-        }
-        return newHomePageResponse(HomePageList(request.name, items), hasNext)
-    }
-
-    override suspend fun search(query: String): List<SearchResponse> {
-        return fetchSearch(query, 20, 0).mapNotNull { b ->
-            newTvSeriesSearchResponse(b.book_name ?: return@mapNotNull null, "$mainUrl/series/${b.book_id ?: return@mapNotNull null}", TvType.TvSeries) {
-                this.posterUrl = b.thumb_url
-            }
-        }
-    }
+    
+    // Gunakan User-Agent terbaru dari hasil inspeksi web kamu
+    private val browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 
     override suspend fun load(url: String): LoadResponse {
         val bookId = url.substringAfterLast("/").substringBefore("?").trim()
@@ -72,7 +34,7 @@ class Melolo : MainAPI() {
                 newEpisode(
                     EpisodeData(
                         bookId, detail.series_id_str ?: bookId, ep.vid ?: return@mapNotNull null,
-                        ep.vid_index ?: return@mapNotNull null, 2 // Paksa ke platform 2 (Web)
+                        ep.vid_index ?: return@mapNotNull null, 2 // PAKSA PLATFORM 2 (WEB)
                     ).toJson()
                 ) {
                     this.name = "Episode ${ep.vid_index}"
@@ -110,9 +72,9 @@ class Melolo : MainAPI() {
 
         val responseText = executeWithRetry {
             rateLimitDelay(moduleName = "Melolo")
-            // Gunakan domain yang sama dengan mainUrl agar resolve-nya konsisten
+            // Bypass DNS: Tembak langsung ke melolo.com, bukan api.tmthreader.com
             app.post(
-                "https://api.tmthreader.com/novel/player/video_model/v1/?aid=$aid",
+                "$mainUrl/novel/player/video_model/v1/?aid=$aid",
                 requestBody = body.toRequestBody("application/json".toMediaType()),
                 headers = mapOf(
                     "Content-Type" to "application/json",
@@ -126,13 +88,12 @@ class Melolo : MainAPI() {
 
         val resp = tryParseJson<PlayerVideoModelResponse>(responseText)
         
-        // Ekstraksi link dengan fallback
+        // Fallback untuk berbagai struktur JSON link video
         val videoUrl = resp?.data?.main_url 
             ?: resp?.data?.video_info?.main_url 
             ?: resp?.data?.video_model?.video_list?.values?.firstOrNull()?.main_url
 
         val backupUrl = resp?.data?.backup_url ?: resp?.data?.video_info?.backup_url
-
         val links = listOfNotNull(videoUrl, backupUrl).distinct()
 
         links.forEach { url ->
@@ -148,8 +109,7 @@ class Melolo : MainAPI() {
         return links.isNotEmpty()
     }
 
-    // --- Private Fetchers (Gunakan catalogBase agar metadata tetap aman) ---
-
+    // --- Fetcher Metadata Tetap Menggunakan Azure Proxy agar tidak kena blokir ---
     private suspend fun fetchLatest(): List<CatalogBook> = try {
         val res = app.get("$catalogBase/latest")
         tryParseJson<CatalogLatestResponse>(res.text)?.books.orEmpty().filter { it.language.equals("id", true) }
@@ -166,16 +126,29 @@ class Melolo : MainAPI() {
         tryParseJson<CatalogSearchResponse>(res.text)?.data?.search_data?.flatMap { it.books }.orEmpty().filter { it.language.equals("id", true) }
     } catch (_: Exception) { emptyList() }
 
-    private suspend fun fetchSearchPage(query: String, limit: Int, offset: Int): Pair<List<CatalogBook>, Boolean> = try {
-        val url = "$catalogBase/search?query=${URLEncoder.encode(query, "UTF-8")}&limit=$limit&offset=$offset"
-        val res = app.get(url)
-        val resp = tryParseJson<CatalogSearchResponse>(res.text)
-        (resp?.data?.search_data?.flatMap { it.books }.orEmpty().filter { it.language.equals("id", true) }) to (resp?.data?.has_more == true)
-    } catch (_: Exception) { emptyList<CatalogBook>() to false }
-
     private suspend fun fetchDetail(bookId: String): CatalogVideoData {
         val res = app.get("$catalogBase/detail/$bookId")
-        return tryParseJson<CatalogDetailResponse>(res.text)?.data?.video_data ?: throw ErrorLoadingException("Data Detail Kosong")
+        return tryParseJson<CatalogDetailResponse>(res.text)?.data?.video_data ?: throw ErrorLoadingException("Detail Empty")
+    }
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val isSearchCategory = request.data.startsWith("q:", true)
+        val books = if (isSearchCategory) {
+            val url = "$catalogBase/search?query=${URLEncoder.encode(request.data.removePrefix("q:"), "UTF-8")}&limit=20&offset=${(page-1)*20}"
+            tryParseJson<CatalogSearchResponse>(app.get(url).text)?.data?.search_data?.flatMap { it.books }.orEmpty()
+        } else {
+            if (request.data == "trending") fetchTrending() else fetchLatest()
+        }
+        val items = books.mapNotNull { b ->
+            newTvSeriesSearchResponse(b.book_name ?: return@mapNotNull null, "$mainUrl/series/${b.book_id ?: return@mapNotNull null}", TvType.TvSeries) { this.posterUrl = b.thumb_url }
+        }
+        return newHomePageResponse(HomePageList(request.name, items), false)
+    }
+
+    override suspend fun search(query: String): List<SearchResponse> {
+        return fetchSearch(query, 20, 0).mapNotNull { b ->
+            newTvSeriesSearchResponse(b.book_name ?: return@mapNotNull null, "$mainUrl/series/${b.book_id ?: return@mapNotNull null}", TvType.TvSeries) { this.posterUrl = b.thumb_url }
+        }
     }
 
     // --- Data Classes ---
@@ -188,7 +161,6 @@ class Melolo : MainAPI() {
     )
     data class PlayerVideoInfo(@JsonProperty("main_url") val main_url: String? = null, @JsonProperty("backup_url") val backup_url: String? = null)
     data class PlayerVideoModel(@JsonProperty("video_list") val video_list: Map<String, PlayerVideoInfo>? = null)
-
     data class CatalogLatestResponse(@JsonProperty("books") val books: List<CatalogBook> = emptyList())
     data class CatalogTrendingResponse(@JsonProperty("books") val books: List<CatalogBook> = emptyList())
     data class CatalogSearchResponse(@JsonProperty("data") val data: CatalogSearchData? = null)
