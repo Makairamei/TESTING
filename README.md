@@ -38,7 +38,7 @@ Repository extension CloudStream custom berisi berbagai provider anime, donghua,
 ## 🔗 Repository URL
 
 ```txt
-https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/builds/repo.json
+https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/master/repo.json
 ```
 
 ---
