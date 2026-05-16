@@ -1,9 +1,11 @@
-package com.iqiyi
+package com.lagradost.cloudstream3.movieproviders
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
-import java.net.URLEncoder
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.Extensions.toQueryParams
 
 class IqiyiProvider : MainAPI() {
     override var mainUrl = "https://www.iq.com"
@@ -14,40 +16,38 @@ class IqiyiProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.Anime)
 
     companion object {
-        private const val API_BASE = "https://intl-api.iq.com/3f4/pcw-api.iq.com"
+        private const val API_BASE = "https://api.iq.com"
         
+        // Headers emulasi berdasarkan hasil bongkar Webpack Bundle JS kemarin
         private val baseHeaders = mapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
             "Referer" to "https://www.iq.com/",
             "Accept" to "application/json, text/plain, */*"
         )
 
-        private fun buildIqiyiUrl(endpoint: String, extra: Map<String, String> = emptyMap()): String {
-            val defaultParams = mapOf(
+        // Helper otomatis menyisipkan parameter platformId=3 dari hasil reverse engineering
+        private fun getIqiyiParams(extra: Map<String, String> = emptyMap()): String {
+            val default = mapOf(
                 "platformId" to "3",
                 "lang" to "id_id",
                 "mod" to "id"
             )
-            val allParams = defaultParams + extra
-            val queryString = allParams.map { 
-                "${it.key}=${URLEncoder.encode(it.value, "UTF-8")}" 
-            }.joinToString("&")
-            
-            return "$API_BASE$endpoint?$queryString"
+            return (default + extra).toQueryParams()
         }
     }
 
     // ==================== 1. SEARCH / PENCARIAN ====================
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = buildIqiyiUrl("/api/search2", mapOf("k_word" to query, "pageNum" to "1", "pageSize" to "20"))
+        // ⚠️ YANG KURANG: Jalur URL API asli untuk search
+        val searchUrl = "$API_BASE/JALUR_API_SEARCH_ASLI${getIqiyiParams(mapOf("k_word" to query))}"
         val rawResponse = app.get(searchUrl, headers = baseHeaders).text
         
         val searchData = parseJson<IqiyiSearchResponse>(rawResponse)
         return searchData.data?.list?.map { item ->
             newTvSeriesSearchResponse(
                 name = item.name ?: "",
-                url = item.albumIdStr ?: "",
-                type = TvType.TvSeries
+                url = item.albumIdStr ?: "", 
+                tvType = TvType.TvSeries // ✅ FIX: diubah dari 'type' ke 'tvType'
             ) {
                 this.posterUrl = item.pic
             }
@@ -56,43 +56,42 @@ class IqiyiProvider : MainAPI() {
 
     // ==================== 2. LOAD / DETAIL HALAMAN ====================
     override suspend fun load(url: String): LoadResponse {
-        val episodeListUrl = buildIqiyiUrl("/api/v2/episode-list-paging", mapOf("albumId" to url, "page_num" to "1", "page_size" to "100"))
+        // 'url' di sini berisi albumIdStr (Parent ID)
+        
+        // ⚠️ YANG KURANG: URL API untuk menarik daftar semua episode di dalam satu Album/Series
+        val episodeListUrl = "$API_BASE/JALUR_API_LIST_EPISODE_ASLI${getIqiyiParams(mapOf("albumId" to url))}"
         val rawEpisodes = app.get(episodeListUrl, headers = baseHeaders).text
         
-        val pageResponse = parseJson<IqiyiEpisodePageResponse>(rawEpisodes)
+        val albumDetail = parseJson<IqiyiDetailResponse>(rawEpisodes).data
         
-        val episodes = pageResponse.data?.list?.map { ep ->
-            newEpisode(ep.qipuIdStr ?: "") {
-                this.name = ep.name ?: "Episode ${ep.order}"
-                this.episode = ep.order
-                this.posterUrl = ep.posterPic
-            }
-        } ?: emptyList()
-
-        val firstItem = pageResponse.data?.list?.firstOrNull()
-        val albumTitle = firstItem?.albumName ?: "iQIYI Series"
-        val albumPlot = firstItem?.albumDesc ?: ""
-        val albumPoster = firstItem?.albumPic ?: ""
+        val episodes = listOf(
+            Episode(
+                data = albumDetail?.qipuIdStr ?: "", // Mengoper qipuIdStr spesifik episode ke loadLinks()
+                name = albumDetail?.name ?: "Episode 1",
+                episode = albumDetail?.order ?: 1
+            )
+        )
 
         return newTvSeriesLoadResponse(
-            name = albumTitle,
+            name = albumDetail?.albumName ?: "",
             url = url,
-            type = TvType.TvSeries,
+            tvType = TvType.TvSeries, // ✅ FIX: diubah dari 'type' ke 'tvType'
             episodes = episodes
         ) {
-            this.posterUrl = albumPoster
-            this.plot = albumPlot
+            this.posterUrl = albumDetail?.posterPic
+            this.plot = albumDetail?.albumDesc
         }
     }
 
     // ==================== 3. EXTRACTOR / PLAYER LINKS ====================
     override suspend fun loadLinks(
-        data: String,
+        data: String, // Berisi qipuIdStr / tvid per episode
         isCaster: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val vmsUrl = buildIqiyiUrl("/api/pvvp", mapOf("tvid" to data, "bid" to "300"))
+        // ⚠️ YANG KURANG: URL API VMS / Stream Dispatcher asli milik iQIYI
+        val vmsUrl = "$API_BASE/JALUR_API_VMS_PLAYER_ASLI${getIqiyiParams(mapOf("tvid" to data))}"
         val rawPlayerResponse = app.get(vmsUrl, headers = baseHeaders).text
         
         val playerResult = parseJson<IqiyiPlayerResponse>(rawPlayerResponse)
@@ -110,13 +109,13 @@ class IqiyiProvider : MainAPI() {
             }
 
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = "iQIYI - ${cdnName.uppercase()}",
-                    name = "iQIYI Stream Player",
+                    name = "iQIYI Stream",
                     url = videoUrl,
                     referer = "https://www.iq.com/",
                     quality = quality,
-                    isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".mpd")
+                    isM3u8 = videoUrl.contains(".m3u8")
                 )
             )
         }
@@ -124,7 +123,7 @@ class IqiyiProvider : MainAPI() {
     }
 }
 
-// ==================== DATA MODELS ====================
+// ==================== JSON DATA MODELS (JACKSON) ====================
 data class IqiyiSearchResponse(@JsonProperty("data") val data: IqiyiSearchData? = null)
 data class IqiyiSearchData(@JsonProperty("list") val list: List<IqiyiSearchItem>? = null)
 data class IqiyiSearchItem(
@@ -133,15 +132,13 @@ data class IqiyiSearchItem(
     @JsonProperty("pic") val pic: String? = null
 )
 
-data class IqiyiEpisodePageResponse(@JsonProperty("data") val data: IqiyiEpisodePageData? = null)
-data class IqiyiEpisodePageData(@JsonProperty("list") val list: List<IqiyiEpisodeDetailItem>? = null)
-data class IqiyiEpisodeDetailItem(
+data class IqiyiDetailResponse(@JsonProperty("data") val data: IqiyiDetailData? = null)
+data class IqiyiDetailData(
     @JsonProperty("qipuIdStr") val qipuIdStr: String? = null,
     @JsonProperty("albumName") val albumName: String? = null,
     @JsonProperty("name") val name: String? = null,
     @JsonProperty("albumDesc") val albumDesc: String? = null,
     @JsonProperty("posterPic") val posterPic: String? = null,
-    @JsonProperty("albumPic") val albumPic: String? = null,
     @JsonProperty("order") val order: Int? = null
 )
 
