@@ -244,5 +244,26 @@
         "iconUrl": "https://www.google.com/s2/favicons?domain=jav.guru&sz=%size%",
         "apiVersion": 1,
         "fileHash": "sha256-2ef817d9f83596a097e75b5f728f6cad63877f9899ed1092b31012a0226bf2f5"
+    },
+    {
+        "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/CNC%20Verse/icon.png",
+        "fileHash": "sha256-7fedb61bae2b9bbed734657d2958f2b3275242417dc3e9580de7fc5fddd1087b",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/sad25kag/BetbetMiro-Extension",
+        "fileSize": 70695,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "BetbetMiro"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 59,
+        "internalName": "CNC Verse",
+        "description": "Netflix, PrimeVideo, Disney+ Hotstar Contents in Multiple Languages",
+        "url": "https://raw.githubusercontent.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/builds/CNC Verse.cs3",
+        "name": "CNC Verse"
     }
 ]
