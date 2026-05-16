@@ -85,31 +85,6 @@
         "fileHash": "sha256-af29b2010107ce2b162f1756fce80b71cff4b64e099b5d1920b6fc3a192bdb7e"
     },
     {
-        "url": "https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/master/Betbet/StreamPlay.cs3",
-        "status": 1,
-        "version": 632,
-        "name": "StreamPlay",
-        "internalName": "StreamPlay",
-        "authors": [
-            "BetbetMiro"
-        ],
-        "description": "#1 best extention based on MultiAPI",
-        "fileSize": 969244,
-        "repositoryUrl": "https://github.com/sad25kag/BetbetMiro-Extension",
-        "language": "id",
-        "tvTypes": [
-            "AsianDrama",
-            "TvSeries",
-            "Anime",
-            "Movie",
-            "Cartoon",
-            "AnimeMovie"
-        ],
-        "iconUrl": "https://i3.wp.com/yt3.googleusercontent.com/ytc/AIdro_nCBArSmvOc6o-k2hTYpLtQMPrKqGtAw_nC20rxm70akA=s900-c-k-c0x00ffffff-no-rj?ssl=1",
-        "apiVersion": 1,
-        "fileHash": "sha256-45603ce92945ccb39c33b71181f82b90b431270e1d8ae65ffe550e4d433fe9d6"
-    },
-    {
         "url": "https://raw.githubusercontent.com/sad25kag/BetbetMiro-Extension/master/Betbet/Ultima.cs3",
         "status": 2,
         "version": 34,
