@@ -17,7 +17,6 @@ class YunshanID : MainAPI() {
         const val API_BASE = "https://yunshanid.site/api"
     }
 
-    // Mengelompokkan kategori menu utama di CloudStream
     override val mainPage = mainPageOf(
         "latest" to "Rilisan Terbaru",
         "ongoing" to "Donghua Ongoing",
@@ -29,17 +28,23 @@ class YunshanID : MainAPI() {
         val response = app.get("$API_BASE/donghuas").text
         val items = tryParseJson<List<YunshanItem>>(response) ?: emptyList()
         
-        // Memfilter list data lokal berdasarkan kategori menu yang diklik
         val filteredItems = when (request.data) {
             "ongoing" -> items.filter { it.status?.contains("On-Going", true) == true }
             "completed" -> items.filter { it.status?.contains("Completed", true) == true }
             "movie" -> items.filter { it.type?.contains("Movie", true) == true }
-            else -> items // "latest" menampilkan semua
+            else -> items
         }
 
         val homeResults = filteredItems.map { item ->
-            newAnimeSearchResponse(item.title, item.id.toString(), TvType.Anime) {
+            // FIX: Menggunakan URL resmi situs agar fitur "Open in Browser" aktif & tidak 404
+            newAnimeSearchResponse(item.title, "$mainUrl/donghua/${item.id}", TvType.Anime) {
                 this.posterUrl = item.posterUrl ?: item.poster
+                
+                // FIX: Memunculkan badge jumlah episode terakhir di pojok poster seperti Anichin
+                val maxEp = item.episodesMap?.maxOrNull()
+                if (maxEp != null) {
+                    this.latestEpisode = maxEp
+                }
             }
         }
 
@@ -50,29 +55,33 @@ class YunshanID : MainAPI() {
         val response = app.get("$API_BASE/donghuas").text
         val items = tryParseJson<List<YunshanItem>>(response) ?: emptyList()
 
-        // Mencari judul donghua yang cocok (case-insensitive)
         return items.filter { it.title.contains(query, true) }.map { item ->
-            newAnimeSearchResponse(item.title, item.id.toString(), TvType.Anime) {
+            newAnimeSearchResponse(item.title, "$mainUrl/donghua/${item.id}", TvType.Anime) {
                 this.posterUrl = item.posterUrl ?: item.poster
+                
+                // FIX: Badge episode juga muncul di hasil pencarian
+                val maxEp = item.episodesMap?.maxOrNull()
+                if (maxEp != null) {
+                    this.latestEpisode = maxEp
+                }
             }
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val id = url
+        // FIX: Mengambil ID angka dari potongan akhir URL resmi (misal dari /donghua/91 diambil 91)
+        val id = url.substringAfterLast("/")
         
-        // FIX: Mengambil langsung dari list utama untuk menghindari error kegagalan struktural parsing di /api/donghua/id
         val response = app.get("$API_BASE/donghuas").text
         val items = tryParseJson<List<YunshanItem>>(response) ?: emptyList()
         
-        // Cari data donghua spesifik yang dicari berdasarkan ID
         val item = items.find { it.id.toString() == id } 
             ?: throw ErrorLoadingException("Detail Donghua tidak ditemukan")
 
         val title = item.title
         val poster = item.posterUrl ?: item.poster
         val description = item.synopsis
-        val tags = item.genres // Menampilkan daftar genre/tag secara lengkap
+        val tags = item.genres
 
         val tvType = if (item.type?.contains("Movie", true) == true) TvType.Movie else TvType.TvSeries
 
@@ -83,7 +92,6 @@ class YunshanID : MainAPI() {
                 this.tags = tags
             }
         } else {
-            // Mengurutkan deretan nomor episode dari yang paling kecil ke besar
             val episodes = item.episodesMap?.sorted()?.map { epNum ->
                 newEpisode("$id-$epNum") {
                     this.name = "Episode $epNum"
@@ -110,30 +118,21 @@ class YunshanID : MainAPI() {
         val animeId = parts[0]
         val epNum = parts[1]
 
-        // Mengambil respons teks dari player internal watch
         val watchResponse = app.get("$API_BASE/watch/$animeId/$epNum").text
-
-        // FIX: Bersihkan karakter pelindung escape backslash (\/) bawaan database JSON
-        // Agar pencarian Regex tidak memotong string URL utama
         val cleanResponse = watchResponse.replace("\\/", "/")
 
-        // Menggunakan regex aman penangkap string link di dalam tanda kutip database
         val linkRegex = """https?://[^\s"']+""".toRegex()
         val foundLinks = linkRegex.findAll(cleanResponse).map { it.value }.toList()
 
         var linkFound = false
         for (link in foundLinks) {
-            // Bersihkan sisa karakter penutup string jika terikut di ujung URL
             val cleanLink = link.trim().removeSuffix("\\").removeSuffix("\"").removeSuffix("'")
-            
-            // Oper tautan ke sistem pemutar video bawaan CloudStream (seperti OkRu)
             if (cleanLink.contains("ok.ru") || cleanLink.contains("odnoklassniki") || cleanLink.contains("video")) {
                 loadExtractor(cleanLink, subtitleCallback, callback)
                 linkFound = true
             }
         }
 
-        // Jalur Cadangan: Jika tidak ada filter yang cocok, paksa muat URL pertama yang valid
         if (!linkFound && foundLinks.isNotEmpty()) {
             val primaryLink = foundLinks.first().trim().removeSuffix("\\").removeSuffix("\"").removeSuffix("'")
             if (primaryLink.startsWith("http")) {
@@ -146,7 +145,6 @@ class YunshanID : MainAPI() {
     }
 }
 
-// Model Data Class penampung data JSON terintegrasi
 data class YunshanItem(
     val id: Int,
     val title: String,
