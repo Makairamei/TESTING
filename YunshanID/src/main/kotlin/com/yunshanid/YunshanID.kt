@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.utils.*
 
 class YunshanID : MainAPI() {
     override var mainUrl = "https://yunshanid.site"
-    override var name = "Yunshan ID 🏔️ Lagi Tahap Perbaikan"
+    override var name = "Yunshan ID 🏔️"
     override val hasMainPage = true
     override var lang = "id"
     override val hasDownloadSupport = true
@@ -38,11 +38,7 @@ class YunshanID : MainAPI() {
         val homeResults = filteredItems.map { item ->
             newAnimeSearchResponse(item.title, "$mainUrl/donghua/${item.id}", TvType.Anime) {
                 this.posterUrl = item.posterUrl ?: item.poster
-                
-                val maxEp = item.episodesMap?.maxOrNull()
-                if (maxEp != null) {
-                    this.latestEpisode = maxEp
-                }
+                // Baris latestEpisode yang bikin error sudah dibuang
             }
         }
 
@@ -56,11 +52,7 @@ class YunshanID : MainAPI() {
         return items.filter { it.title.contains(query, true) }.map { item ->
             newAnimeSearchResponse(item.title, "$mainUrl/donghua/${item.id}", TvType.Anime) {
                 this.posterUrl = item.posterUrl ?: item.poster
-                
-                val maxEp = item.episodesMap?.maxOrNull()
-                if (maxEp != null) {
-                    this.latestEpisode = maxEp
-                }
+                // Baris latestEpisode yang bikin error sudah dibuang
             }
         }
     }
