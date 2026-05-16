@@ -1,4 +1,4 @@
-package com.com.shortmax
+package com.shortmax
 
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty

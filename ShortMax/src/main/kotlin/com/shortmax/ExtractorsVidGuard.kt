@@ -1,4 +1,4 @@
-package com.com.shortmax
+package com.shortmax
 
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.SubtitleFile
