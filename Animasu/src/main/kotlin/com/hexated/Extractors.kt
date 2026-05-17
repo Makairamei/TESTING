@@ -23,13 +23,17 @@ class Archivd : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         val res = app.get(url).document
-        val json = res.select("div#app").attr("data-page")
+        val json = res.selectFirst("div#app")?.attr("data-page")
+        if (json.isNullOrBlank()) return
+
         val video = AppUtils.tryParseJson<Sources>(json)?.props?.datas?.data?.link?.media
+        if (video.isNullOrBlank()) return
+
         callback.invoke(
             newExtractorLink(
                 this.name,
                 this.name,
-                video ?: return,
+                video,
                 INFER_TYPE
             ) {
                 this.referer = "$mainUrl/"
@@ -69,9 +73,14 @@ class Newuservideo : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val iframe = app.get(url,referer=referer).document.select("iframe#videoFrame").attr("src")
-        val doc = app.get(iframe,referer="$mainUrl/").text
-        val json = "VIDEO_CONFIG\\s?=\\s?(.*)".toRegex().find(doc)?.groupValues?.get(1)
+        val iframeSrc = app.get(url, referer = referer).document.selectFirst("iframe#videoFrame")?.attr("src")
+        if (iframeSrc.isNullOrBlank()) return
+        val iframeUrl = fixUrl(iframeSrc)
+
+        val doc = app.get(iframeUrl, referer = "$mainUrl/").text
+        // Melakukan isolasi objek json secara ketat agar tidak mengangkut karakter berekor seperti semicolon
+        val json = "VIDEO_CONFIG\\s?=\\s?(\\{.*?\\})".toRegex().find(doc)?.groupValues?.get(1)
+            ?: "VIDEO_CONFIG\\s?=\\s?(.*)".toRegex().find(doc)?.groupValues?.get(1)
 
         AppUtils.tryParseJson<Sources>(json)?.streams?.map {
             callback.invoke(
@@ -90,7 +99,6 @@ class Newuservideo : ExtractorApi() {
                 }
             )
         }
-
     }
 
     data class Streams(
@@ -101,7 +109,6 @@ class Newuservideo : ExtractorApi() {
     data class Sources(
         @JsonProperty("streams") val streams: ArrayList<Streams>? = null,
     )
-
 }
 
 class Vidhidepro : Filesim() {
