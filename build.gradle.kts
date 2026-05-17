@@ -1,5 +1,7 @@
 import com.android.build.gradle.BaseExtension
 import com.lagradost.cloudstream3.gradle.CloudstreamExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 buildscript {
     repositories {
@@ -12,7 +14,7 @@ buildscript {
         classpath("com.android.tools.build:gradle:8.7.3")
         // CloudStream Gradle Plugin
         classpath("com.github.recloudstream:gradle:master-SNAPSHOT")
-        // Kotlin
+        // Kotlin Modern
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
     }
 }
@@ -51,8 +53,15 @@ subprojects {
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
-            allWarningsAsErrors.set(false) // Saklar anti-warning global
+            jvmTarget.set(JvmTarget.JVM_11)
+            allWarningsAsErrors.set(false)
+
+            // ⚡ JURUS SAKTI MESIN WAKTU ⚡
+            // Paksa compiler Kotlin turun kasta ke versi 1.9 agar semua syntax usang 
+            // di modul Allpornstream, Animasu, dll dimaafkan dan tidak dianggap eror!
+            languageVersion.set(KotlinVersion.KOTLIN_1_9)
+            apiVersion.set(KotlinVersion.KOTLIN_1_9)
+            freeCompilerArgs.addAll(listOf("-Xsuppress-version-warnings"))
         }
     }
 
@@ -63,12 +72,6 @@ subprojects {
         defaultConfig {
             minSdk = 21
             targetSdk = 35
-        }
-
-        // TAKTIK PARALISIS HALUS: Jika bukan folder DrakorProvider, kosongkan barisan source kodenya!
-        // Dengan begitu, task kemasan tetep jalan dengan aman, tapi gak ada kode tetangga yang di-compile!
-        if (project.name != "DrakorProvider") {
-            sourceSets.getByName("main").java.setSrcDirs(emptyList<File>())
         }
 
         compileOptions {
