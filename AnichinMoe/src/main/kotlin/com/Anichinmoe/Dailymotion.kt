@@ -47,7 +47,7 @@ open class Dailymotion : ExtractorApi() {
             subRegex.findAll(subtitleJson).forEach { match ->
                 val label = match.groupValues[1]
                 val subUrl = match.groupValues[2]
-                subtitleCallback(SubtitleFile(label, subUrl))
+                subtitleCallback(SubtitleFile(url = subUrl, lang = label))
             }
         }
     }
