@@ -25,16 +25,14 @@ android {
     namespace = "com.youtube.live"
     compileSdk = 34
 
-defaultConfig {
+    defaultConfig {
         minSdk = 21
-        targetSdk = 34
     }
 
     buildFeatures {
         buildConfig = true
         viewBinding = true
     }
-
 }
 
 dependencies {
