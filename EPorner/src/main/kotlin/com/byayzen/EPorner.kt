@@ -8,7 +8,6 @@ import com.lagradost.cloudstream3.utils.*
 // FIX: getQualityFromName and getQualityFromName are inside the AppUtils object.
 // Wildcard import com.lagradost.cloudstream3.utils.* does NOT resolve object members.
 // Must be imported explicitly.
-import com.lagradost.cloudstream3.utils.AppUtils.getQualityFromName
 import org.jsoup.nodes.Element
 
 class EPorner : MainAPI() {
