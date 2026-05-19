@@ -10,30 +10,18 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainPageRequest
 import com.lagradost.cloudstream3.MainPageData
 import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.SearchResponseList
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
-import com.lagradost.cloudstream3.newSearchResponseList
-import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
-import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.InfoItem.InfoType
-import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
-import org.schabi.newpipe.extractor.localization.ContentCountry
-import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.search.SearchInfo
-import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
-import org.schabi.newpipe.extractor.stream.StreamType
 
 open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?) : MainAPI() {
     override var mainUrl = "https://www.youtube.com"
@@ -45,7 +33,6 @@ open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?)
     open val SEARCH_CONTENT_FILTER = "videos"
     val service = ServiceList.YouTube
 
-    // Menambahkan shortcut kategori hiburan otomatis langsung di halaman utama
     override val mainPage = listOf(
         MainPageData("Alur Cerita Manhua", "manhua_story"),
         MainPageData("Kumpulan Lagu Santai", "relaxing_music"),
@@ -58,6 +45,11 @@ open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?)
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        // Mencegah error pagination dari token yang kosong
+        if (page > 1) {
+            return newHomePageResponse(emptyList(), false)
+        }
+
         val query = when (request.data) {
             "manhua_story" -> "alur cerita manhua manhwa lengkap"
             "relaxing_music" -> "lagu santai akustik lofi"
@@ -67,27 +59,19 @@ open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?)
             else -> "trending"
         }
 
-        val items = getYouTubeQueryItems(query, page)
+        val items = getYouTubeQueryItems(query)
         val homePageList = HomePageList(request.name, items)
-        return newHomePageResponse(listOf(homePageList), hasNext = items.isNotEmpty())
+        return newHomePageResponse(listOf(homePageList), hasNext = false)
     }
 
-    private suspend fun getYouTubeQueryItems(query: String, page: Int): List<SearchResponse> {
+    private suspend fun getYouTubeQueryItems(query: String): List<SearchResponse> {
         return try {
             val filter = listOf(SEARCH_CONTENT_FILTER)
-            val searchInfo = if (page == 1) {
-                SearchInfo.getInfo(
-                    service,
-                    service.searchQHFactory.fromQuery(query, filter, "")
-                )
-            } else {
-                // Untuk menangani pemuatan halaman berikutnya (Infinity Scroll)
-                SearchInfo.getMoreItems(
-                    service,
-                    service.searchQHFactory.fromQuery(query, filter, ""),
-                    Page(null, null, null, null, null) // Cadangan page token kosong jika tidak terdeteksi
-                )
-            }
+            // Memanggil API secara langsung dan eksplisit
+            val searchInfo = SearchInfo.getInfo(
+                service,
+                service.searchQHFactory.fromQuery(query, filter, "")
+            )
 
             searchInfo.relatedItems.mapNotNull { item ->
                 if (item.infoType == InfoType.STREAM) {
@@ -107,23 +91,27 @@ open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val filter = listOf(SEARCH_CONTENT_FILTER)
-        val searchInfo = SearchInfo.getInfo(
-            service,
-            service.searchQHFactory.fromQuery(query, filter, "")
-        )
+        return try {
+            val filter = listOf(SEARCH_CONTENT_FILTER)
+            val searchInfo = SearchInfo.getInfo(
+                service,
+                service.searchQHFactory.fromQuery(query, filter, "")
+            )
 
-        return searchInfo.relatedItems.mapNotNull { item ->
-            if (item.infoType == InfoType.STREAM) {
-                val streamItem = item as StreamInfoItem
-                newMovieSearchResponse(
-                    streamItem.name,
-                    streamItem.url,
-                    TvType.Others
-                ) {
-                    this.posterUrl = streamItem.thumbnails.lastOrNull()?.url
-                }
-            } else null
+            searchInfo.relatedItems.mapNotNull { item ->
+                if (item.infoType == InfoType.STREAM) {
+                    val streamItem = item as StreamInfoItem
+                    newMovieSearchResponse(
+                        streamItem.name,
+                        streamItem.url,
+                        TvType.Others
+                    ) {
+                        this.posterUrl = streamItem.thumbnails.lastOrNull()?.url
+                    }
+                } else null
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -159,7 +147,6 @@ open class YouTubeProvider(language: String, val sharedPref: SharedPreferences?)
                     )
                 )
             )
-            // Properti score tidak dipasang manual demi keamanan kompatibilitas SDK
         }
     }
 
