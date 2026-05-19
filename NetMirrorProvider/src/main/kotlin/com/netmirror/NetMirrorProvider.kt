@@ -12,7 +12,7 @@ import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainPageRequest
 import com.lagradost.cloudstream3.MainPageData
-import com.lagradost.cloudstream3.Score // Memastikan import objek Score versi SDK terbaru
+import com.lagradost.cloudstream3.Score
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
@@ -222,7 +222,7 @@ class NetMirrorProvider : MainAPI() {
 
             this.contentRating = modalData?.ua
             this.year = tmdb?.yearOrNull() ?: payload.year
-            this.score = rawScore?.let { Score(it) } // Memperbaiki penetapan tipe data Score
+            this.score = rawScore?.let { Score(it) }
         }
     }
 
@@ -308,10 +308,6 @@ class NetMirrorProvider : MainAPI() {
         return true
     }
 
-    // ==========================================
-    // BERIKUT ADALAH FUNGSI HELPER YANG WAJIB ADA
-    // ==========================================
-
     private suspend fun buildDetailedLoad(
         url: String,
         payload: LoadPayload,
@@ -388,7 +384,7 @@ class NetMirrorProvider : MainAPI() {
             "$mainUrl/search.php?t=$unixTime",
             headers = ajaxHeaders,
             referer = "$mainUrl/home"
-        ).parsedSafe<SearchData>() ?: return emptyList()
+        ).parsedSafe<SearchData>() ?: emptyList()
 
         return payload.searchResult
             .take(12)
@@ -640,10 +636,6 @@ class NetMirrorProvider : MainAPI() {
         )
     }
 }
-
-// ==========================================
-// DATA CLASS MODEL STRUKTUR NETMIRROR DATA
-// ==========================================
 
 data class LoadPayload(
     val id: String?,
