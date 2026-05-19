@@ -30,24 +30,29 @@ class InvidiousProvider : MainAPI() {
     override var lang = "en"
     override val hasMainPage = true
 
-    // Mendefinisikan menu beranda agar tab Popular & Trending muncul di aplikasi
+    // Menambahkan inisialisasi menu beranda agar kompatibel dengan SDK terbaru
     override val mainPage = listOf(
-        MainPageData("Popular", "popular"),
-        MainPageData("Trending", "trending")
+        MainPageData("Popular & Trending", "home")
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val type = request.data
-        val url = "$mainUrl/api/v1/$type?fields=videoId,title"
-        val res = tryParseJson<List<SearchEntry>>(app.get(url).text)
-        val list = res?.map { it.toSearchResponse(this) } ?: emptyList()
-        
+        val popular = tryParseJson<List<SearchEntry>>(
+            app.get("$mainUrl/api/v1/popular?fields=videoId,title").text
+        )
+        val trending = tryParseJson<List<SearchEntry>>(
+            app.get("$mainUrl/api/v1/trending?fields=videoId,title").text
+        )
         return newHomePageResponse(
             listOf(
                 HomePageList(
-                    request.name,
-                    list,
-                    false
+                    "Popular",
+                    popular?.map { it.toSearchResponse(this) } ?: emptyList(),
+                    true
+                ),
+                HomePageList(
+                    "Trending",
+                    trending?.map { it.toSearchResponse(this) } ?: emptyList(),
+                    true
                 )
             ),
             false
@@ -66,7 +71,7 @@ class InvidiousProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val videoId = Regex("watch\\?v=([a-zA-Z0-9_-]+)").find(url)?.groupValues?.get(1)
         val res = tryParseJson<VideoEntry>(
-            app.get("$mainUrl/api/v1/videos/$videoId?fields=videoId,title,description,recommendedVideos,author,authorThumbnails").text
+            app.get("$mainUrl/api/v1/videos/$videoId?fields=videoId,title,description,recommendedVideos,author,authorThumbnails,formatStreams").text
         )
         return res?.toLoadResponse(this)
     }
@@ -130,6 +135,7 @@ class InvidiousProvider : MainAPI() {
             callback
         )
         
+        // Memperbaiki pembuatan link DASH menggunakan kelas objek ExtractorLink murni
         callback(
             ExtractorLink(
                 source = this.name,
