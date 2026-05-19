@@ -41,11 +41,12 @@ jobs:
 
           plugins=$(git diff --name-only HEAD^ HEAD \
             | grep '^src/' \
-            | cut -d '/' -f2 \
+            | awk -F/ '{print $2}' \
             | sort -u \
             | tr '\n' ' ')
 
-          echo "plugins=$plugins"
+          echo "Detected plugins:"
+          echo "$plugins"
 
           echo "plugins=$plugins" >> $GITHUB_OUTPUT
 
