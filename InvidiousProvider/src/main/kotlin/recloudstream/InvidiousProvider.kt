@@ -22,6 +22,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
 
 class InvidiousProvider : MainAPI() { // all providers must be an instance of MainAPI
     override var mainUrl = "https://inv.nadeko.net"
@@ -138,16 +139,16 @@ class InvidiousProvider : MainAPI() { // all providers must be an instance of Ma
             callback
         )
         
-        // Memperbaiki instansiasi link video tanpa menggunakan objek ExtractorLinkType lama
+        // Memperbaiki pemanggilan link menggunakan DSL newExtractorLink resmi agar lulus kompilasi
         callback(
-            ExtractorLink(
-                source = this.name,
-                name = this.name,
-                url = "$mainUrl/api/manifest/dash/id/$data",
-                referer = "",
-                quality = Qualities.Unknown.value,
-                isM3u8 = false
-            )
+            newExtractorLink(
+                this.name,
+                this.name,
+                "$mainUrl/api/manifest/dash/id/$data"
+            ) {
+                quality = Qualities.Unknown.value
+                referer = ""
+            }
         )
         return true
     }
