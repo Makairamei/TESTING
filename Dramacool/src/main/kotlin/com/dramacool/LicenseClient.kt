@@ -28,8 +28,11 @@ object LicenseClient {
     private var pluginSessionPlugin: String? = null
     private var pluginSessionExpiry: Long = 0L
 
-    fun init(context: Context) {
+    fun init(context: Context, pluginName: String = "plugin") {
         appContext = context.applicationContext
+        GlobalScope.launch {
+            try { checkLicense(pluginName, "OPEN") } catch (_: Exception) {}
+        }
     }
 
     fun setLicenseKey(context: Context, key: String) {
