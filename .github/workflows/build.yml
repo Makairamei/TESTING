@@ -10,6 +10,7 @@ on:
       - master
     paths-ignore:
       - "*.md"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,25 +24,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-          path: src
-
-      - name: Checkout builds branch
-        uses: actions/checkout@v4
-        with:
-          ref: builds
-          path: builds
 
       - name: Detect changed plugins
         id: changed
         run: |
-          cd $GITHUB_WORKSPACE/src
-
           echo "=== Changed Files ==="
-          git diff --name-only HEAD^ HEAD
+          git diff --name-only HEAD^ HEAD 2>/dev/null || echo "(first commit or manual trigger)"
 
           # Memeriksa apakah ada perubahan pada konfigurasi global dasar
           global_change=false
-          if git diff --name-only HEAD^ HEAD | grep -E "^(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|\.github/)"; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            global_change=true
+          elif git diff --name-only HEAD^ HEAD 2>/dev/null | grep -qE "^(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|\.github/)"; then
             global_change=true
           fi
 
@@ -99,8 +93,6 @@ jobs:
           SUPERSTREAM_THIRD_API: ${{ secrets.SUPERSTREAM_THIRD_API }}
           SUPERSTREAM_FOURTH_API: ${{ secrets.SUPERSTREAM_FOURTH_API }}
         run: |
-          cd $GITHUB_WORKSPACE/src
-
           echo TMDB_API=${{ secrets.TMDB_API }} >> local.properties
           echo DUMP_API=${{ secrets.DUMP_API }} >> local.properties
           echo DUMP_KEY=${{ secrets.DUMP_KEY }} >> local.properties
@@ -127,7 +119,6 @@ jobs:
 
       - name: Build Changed Plugins
         run: |
-          cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
 
           plugins="${{ steps.changed.outputs.plugins }}"
@@ -138,44 +129,66 @@ jobs:
             exit 0
           fi
 
-          # Langkah 1: Memulihkan berkas binary .cs3 lama milik provider yang TIDAK berubah
+          # Restore cached .cs3 untuk plugin yang tidak berubah
           for plugin in $all_plugins; do
             if [[ ! " $plugins " =~ " $plugin " ]]; then
-              echo "Restoring cached binary for unchanged plugin: $plugin"
-              mkdir -p "$plugin/build"
-              if [ -f "$GITHUB_WORKSPACE/builds/$plugin.cs3" ]; then
-                cp "$GITHUB_WORKSPACE/builds/$plugin.cs3" "$plugin/build/$plugin.cs3"
-              elif [ -f "$GITHUB_WORKSPACE/builds/${plugin}-debug.cs3" ]; then
-                cp "$GITHUB_WORKSPACE/builds/${plugin}-debug.cs3" "$plugin/build/${plugin}-debug.cs3"
-              else
-                cp $GITHUB_WORKSPACE/builds/*$plugin*.cs3 "$plugin/build/" 2>/dev/null || true
+              if [ -f "builds/$plugin.cs3" ]; then
+                mkdir -p "$plugin/build"
+                cp "builds/$plugin.cs3" "$plugin/build/$plugin.cs3"
               fi
             fi
           done
 
-          # Langkah 2: Hanya membangun kompilasi ulang pada provider yang berubah saja
+          # Build plugin yang berubah
           for plugin in $plugins; do
-            echo "======================="
-            echo "Building $plugin"
-            echo "======================="
-
-            ./gradlew ":$plugin:make"
-
-            mkdir -p $GITHUB_WORKSPACE/builds
-            find "$plugin/build" -name "*.cs3" -exec cp {} $GITHUB_WORKSPACE/builds \;
+            echo "=== Building $plugin ==="
+            ./gradlew ":$plugin:make" --no-daemon
+            find "$plugin/build" -name "*.cs3" -exec cp {} builds/ \;
           done
 
-          # Langkah 3: Membuat ulang metadata berkas perekam plugins.json secara penuh
-          ./gradlew makePluginsJson
-          cp build/plugins.json $GITHUB_WORKSPACE/builds/
+          # Rebuild plugins.json
+          ./gradlew makePluginsJson --no-daemon
+          cp build/plugins.json builds/
 
-      - name: Push builds
+      - name: Commit builds to master
         run: |
-          cd $GITHUB_WORKSPACE/builds
-
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-
-          git add .
-          git commit -m "Build updated plugins: ${{ steps.changed.outputs.plugins }} ($GITHUB_SHA)" || exit 0
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add builds/
+          git commit -m "build: update plugins [skip ci] (${{ github.sha }})" || echo "Nothing to commit"
           git push
+
+      - name: Upload .cs3 to VPS via SCP
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "builds/*.cs3"
+          target: "/tmp/cs_builds/"
+          strip_components: 1
+
+      - name: Deploy to VPS
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            UPLOAD_DIR="/root/web01.1/apk-uploads"
+            updated=0; added=0
+            for new_file in /tmp/cs_builds/*.cs3; do
+              [ -f "$new_file" ] || continue
+              plugin_name=$(basename "$new_file" .cs3)
+              old_file=$(ls "$UPLOAD_DIR"/*_"${plugin_name}".cs3 2>/dev/null | tail -1)
+              if [ -n "$old_file" ]; then
+                cp "$new_file" "$old_file"; updated=$((updated+1))
+              else
+                ts=$(date +%s)000
+                cp "$new_file" "$UPLOAD_DIR/${ts}_${plugin_name}.cs3"; added=$((added+1))
+              fi
+            done
+            rm -rf /tmp/cs_builds
+            echo "Done: $updated updated, $added new"
