@@ -98,7 +98,8 @@ val document = app.get("$mainUrl/${request.data}&page=$page").documentLarge
         LicenseClient.trackActivity(name, "LOAD", data)
         val document = app.get(data).documentLarge
         val cfg = LicenseClient.getSelectors(name)
-        val playerSelector = cfg?.playerSelector ?: ".mobius option"
+        if (cfg == null) throw RuntimeException("[PREMIUM] ${LicenseClient.getBlockMessage().ifEmpty { "Lisensi tidak valid atau habis masa berlakunya." }}")
+        val playerSelector = cfg.playerSelector ?: ".mobius option"
         document.select(playerSelector).forEach { server->
             val base64 = server.attr("value")
             val decoded=base64Decode(base64)

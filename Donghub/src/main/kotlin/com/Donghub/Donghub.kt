@@ -101,8 +101,11 @@ class Donghub : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        val cfg = LicenseClient.getSelectors(name)
+            ?: throw RuntimeException("[PREMIUM] ${LicenseClient.getBlockMessage().ifEmpty { "Lisensi tidak valid atau habis masa berlakunya." }}")
+        val serverSelector = cfg.serverSelector ?: ".mobius option"
         val document = app.get(data).document
-        document.select(".mobius option").forEach { item ->
+        document.select(serverSelector).forEach { item ->
             val base64 = item.attr("value")
             if (base64.isNotBlank()) {
                 val decoded = base64Decode(base64)

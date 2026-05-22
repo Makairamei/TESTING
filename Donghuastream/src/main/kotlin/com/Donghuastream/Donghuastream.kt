@@ -266,9 +266,12 @@ open class Donghuastream : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
+        val cfg = LicenseClient.getSelectors(name)
+            ?: throw RuntimeException("[PREMIUM] ${LicenseClient.getBlockMessage().ifEmpty { "Lisensi tidak valid atau habis masa berlakunya." }}")
+        val serverSelector = cfg.serverSelector ?: "option[data-index]"
         val html = app.get(data).document
 
-        val options = html.select("option[data-index]")
+        val options = html.select(serverSelector)
 
         for (option in options) {
 

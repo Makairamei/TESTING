@@ -241,7 +241,8 @@ open class Animekhor : MainAPI() {
         val document = app.get(data).document
 
         val cfg = LicenseClient.getSelectors(name)
-        val playerSelector = cfg?.playerSelector ?: ".mobius option, #mobius option, select option"
+        if (cfg == null) throw RuntimeException("[PREMIUM] ${LicenseClient.getBlockMessage().ifEmpty { "Lisensi tidak valid atau habis masa berlakunya." }}")
+        val playerSelector = cfg.playerSelector ?: ".mobius option, #mobius option, select option"
         val servers = document.select(playerSelector)
 
         servers.forEach { server ->

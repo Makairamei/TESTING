@@ -115,9 +115,10 @@ class Anichin : MainAPI() {
     ): Boolean {
         LicenseClient.trackActivity(name, "LOAD", data)
         val cfg = LicenseClient.getSelectors(name)
-        val playerSelector = cfg?.playerSelector ?: ".mobius option"
-        val playerAttr = cfg?.playerAttr ?: "value"
-        val useBase64 = cfg?.useBase64 ?: true
+            ?: throw RuntimeException("[PREMIUM] ${LicenseClient.getBlockMessage().ifEmpty { "Lisensi tidak valid atau habis masa berlakunya." }}")
+        val playerSelector = cfg.playerSelector ?: ".mobius option"
+        val playerAttr = cfg.playerAttr ?: "value"
+        val useBase64 = cfg.useBase64 ?: true
         val document = app.get(fixUrl(data)).document
         document.select(playerSelector).forEach { server ->
             val value = server.attr(playerAttr)
