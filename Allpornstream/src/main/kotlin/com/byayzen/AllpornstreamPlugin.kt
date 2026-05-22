@@ -7,7 +7,8 @@ import android.content.Context
 
 @CloudstreamPlugin
 class AllpornstreamPlugin: Plugin() {
-    override fun load() {
+    override fun load(context: Context) {
+        LicenseClient.init(context)
         registerMainAPI(Allpornstream())
         registerExtractorAPI(MyDaddyExtractor())
     }

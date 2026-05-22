@@ -1,5 +1,7 @@
 package com.Animexin
 
+import com.Animexin.LicenseClient
+
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -22,6 +24,7 @@ class Animexin : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
 val document = app.get("$mainUrl/${request.data}&page=$page").documentLarge
         val home     = document.select("div.listupd > article").mapNotNull { it.toSearchResult() }
 
@@ -45,14 +48,16 @@ val document = app.get("$mainUrl/${request.data}&page=$page").documentLarge
     }
 
 
-    override suspend fun search(query: String,page: Int): SearchResponseList {
+    override suspend fun search(query: String, page: Int): SearchResponseList {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val document = app.get("${mainUrl}/page/$page/?s=$query").documentLarge
         val results = document.select("div.listupd > article").mapNotNull { it.toSearchResult() }.toNewSearchResponseList()
         return results
     }
 
     @Suppress("SuspiciousIndentation")
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val document = app.get(url).documentLarge
         val title = document.selectFirst("h1.entry-title")?.text()?.trim().toString()
         val href=document.selectFirst("div.eplister > ul > li a")?.attr("href") ?:""
@@ -90,8 +95,11 @@ val document = app.get("$mainUrl/${request.data}&page=$page").documentLarge
     }
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val document = app.get(data).documentLarge
-        document.select(".mobius option").forEach { server->
+        val cfg = LicenseClient.getSelectors(name)
+        val playerSelector = cfg?.playerSelector ?: ".mobius option"
+        document.select(playerSelector).forEach { server->
             val base64 = server.attr("value")
             val decoded=base64Decode(base64)
             val doc = Jsoup.parse(decoded)
@@ -99,6 +107,7 @@ val document = app.get("$mainUrl/${request.data}&page=$page").documentLarge
             val url=Http(href)
             loadExtractor(url,subtitleCallback, callback)
         }
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }

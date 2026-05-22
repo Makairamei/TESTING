@@ -1,5 +1,7 @@
 package com.Animekhor
 
+import com.Animekhor.LicenseClient
+
 import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
@@ -32,6 +34,7 @@ open class Animekhor : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
 
         val document = app.get(
             "$mainUrl/${request.data}&page=$page"
@@ -101,9 +104,8 @@ open class Animekhor : MainAPI() {
         }
     }
 
-    override suspend fun search(
-        query: String
-    ): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
 
         val searchResponse =
             mutableListOf<SearchResponse>()
@@ -132,9 +134,8 @@ open class Animekhor : MainAPI() {
         return searchResponse
     }
 
-    override suspend fun load(
-        url: String
-    ): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
 
         val document = app.get(url).document
 
@@ -230,18 +231,18 @@ open class Animekhor : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
 
         val document = app.get(data).document
 
-        val servers = document.select(
-            ".mobius option, #mobius option, select option"
-        )
+        val cfg = LicenseClient.getSelectors(name)
+        val playerSelector = cfg?.playerSelector ?: ".mobius option, #mobius option, select option"
+        val servers = document.select(playerSelector)
 
         servers.forEach { server ->
 
@@ -318,6 +319,7 @@ open class Animekhor : MainAPI() {
             }
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 

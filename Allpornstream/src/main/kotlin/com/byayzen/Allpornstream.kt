@@ -2,6 +2,8 @@
 
 package com.byayzen
 
+import com.byayzen.LicenseClient
+
 import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
@@ -170,6 +172,7 @@ class Allpornstream : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
 
         val res = app.get(
             request.data,
@@ -185,9 +188,8 @@ class Allpornstream : MainAPI() {
         )
     }
 
-    override suspend fun search(
-        query: String
-    ): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
 
         val url =
             "${mainUrl}/?search=${
@@ -208,9 +210,8 @@ class Allpornstream : MainAPI() {
         query: String
     ): List<SearchResponse> = search(query)
 
-    override suspend fun load(
-        url: String
-    ): LoadResponse? {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
 
         val res = app.get(
             url,
@@ -303,12 +304,12 @@ class Allpornstream : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
 
         val links =
             if (data.contains("/post/")) {
@@ -345,6 +346,7 @@ class Allpornstream : MainAPI() {
             }
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }

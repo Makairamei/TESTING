@@ -1,5 +1,7 @@
 package recloudstream
 
+import recloudstream.LicenseClient
+
 import com.lagradost.cloudstream3.HomePageList
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LiveSearchResponse
@@ -41,6 +43,7 @@ class TwitchProvider : MainAPI() {
     private val isHorizontal = true
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         return when (request.name) {
             gamesName -> newHomePageResponse(parseGames(), hasNext = false) // Get top games
             else -> {
@@ -95,7 +98,8 @@ class TwitchProvider : MainAPI() {
         }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val realUrl = url.substringAfterLast("/")
         val doc = app.get("$mainUrl/$realUrl", referer = mainUrl).document
         val name = doc.select("div#app-title").text()
@@ -133,12 +137,12 @@ class TwitchProvider : MainAPI() {
         return document.select("table.tops tr").map { it.toLiveSearchResponse() }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         return loadExtractor(data, subtitleCallback, callback)
     }
 

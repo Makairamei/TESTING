@@ -1,5 +1,7 @@
 package recloudstream
 
+import recloudstream.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -25,6 +27,7 @@ class DailymotionProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val url = "https://api.dailymotion.com/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&${request.data}"
         val response = app.get(url).text
         val json = tryParseJson<VideoSearchResponse>(response)
@@ -35,6 +38,7 @@ class DailymotionProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val encodedQuery = try { URLEncoder.encode(query, "UTF-8") } catch (_: Exception) { query }
         val url = "https://api.dailymotion.com/videos?fields=id,title,thumbnail_360_url&limit=20&search=$encodedQuery"
         val response = app.get(url).text
@@ -44,6 +48,7 @@ class DailymotionProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         // Ekstraksi ID video secara aman dari URL untuk ditembak ke API Detail
         val videoId = Regex("dailymotion.com/video/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value 
             ?: url.substringAfter("/video/").substringBefore("?")
@@ -78,12 +83,12 @@ class DailymotionProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         // Menyertakan referer resmi agar bypass m3u8 token berjalan mulus tanpa hambatan
         return loadExtractor(data, "$mainUrl/", subtitleCallback, callback)
     }

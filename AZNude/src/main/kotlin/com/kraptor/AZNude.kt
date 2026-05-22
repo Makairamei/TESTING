@@ -2,6 +2,8 @@
 
 package com.kraptor
 
+import com.kraptor.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.lagradost.api.Log
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -65,6 +67,7 @@ class AZNude : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val document = app.get("${request.data}$page.html").document
         val home = document.select("div.media-list div.media-list-item").mapNotNull { it.toMainPageResult() }
 
@@ -86,6 +89,7 @@ class AZNude : MainAPI() {
 
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
 
         val searchToken = app.get("https://main-aq7es5tiuq-uc.a.run.app/app/search-token", mapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0",
@@ -197,6 +201,7 @@ class AZNude : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val document = app.get(url).document
 
         if (url.contains("/view/celeb/") || (url.contains("/view/movie/"))) {
@@ -252,12 +257,12 @@ class AZNude : MainAPI() {
         return newMovieSearchResponse(title, href, TvType.NSFW) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         Log.d("kraptor_$name", "data = ${data}")
         val document = app.get(data).document
         val scriptElements = document.select("script")
@@ -304,6 +309,7 @@ class AZNude : MainAPI() {
             }
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }

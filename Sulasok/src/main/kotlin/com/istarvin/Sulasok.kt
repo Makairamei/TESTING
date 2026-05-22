@@ -1,5 +1,7 @@
 package com.istarvin
 
+import com.istarvin.LicenseClient
+
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
@@ -45,6 +47,7 @@ class Sulasok : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val url = "$mainUrl/${request.data}&start=${(page - 1) * videoCount}"
         val document = app.get(url).document
         val home = document.select("div.col").mapNotNull { it.toSearchResult() }
@@ -68,6 +71,7 @@ class Sulasok : MainAPI() {
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val url =
             "$mainUrl/load_more_search.php?start=${(page - 1) * videoCount}&limit=$videoCount&search=$query"
         val document = app.get(url).document
@@ -75,7 +79,8 @@ class Sulasok : MainAPI() {
         return newSearchResponseList(list, list.size == videoCount)
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val request = app.get(url)
         val document = request.document
         val title = document.title()
@@ -91,12 +96,12 @@ class Sulasok : MainAPI() {
     private val sources = listOf("vidara", "streamruby")
     private val iframeSrcRegex = Regex("""iframe.src = "(.*)";""")
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val executionList: List<suspend () -> Unit> = sources.map { source ->
             suspend {
                 val text = app.get("$data&s=$source").text
@@ -118,6 +123,7 @@ class Sulasok : MainAPI() {
         }
 
         runLimitedAsync(tasks = executionList.toTypedArray())
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 

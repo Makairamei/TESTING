@@ -1,5 +1,7 @@
 ﻿package com.Animekhor
 
+import android.content.Context
+
 import com.lagradost.cloudstream3.plugins.BasePlugin
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.extractors.Dailymotion
@@ -8,7 +10,8 @@ import com.lagradost.cloudstream3.extractors.Mp4Upload
 
 @CloudstreamPlugin
 class AnimenosubProvider: BasePlugin() {
-    override fun load() {
+    override fun load(context: Context) {
+        LicenseClient.init(context)
         registerMainAPI(Animekhor())
         registerMainAPI(Donghuaword())
         registerExtractorAPI(embedwish())

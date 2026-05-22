@@ -2,6 +2,8 @@
 
 package com.byayzen
 
+import com.byayzen.LicenseClient
+
 import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
@@ -32,6 +34,7 @@ class HentaiWorld : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val url = request.data + if (page > 1) "page/$page/" else ""
         val document = app.get(url).document
         val content = document.selectFirst("div#primary, main#main") ?: document
@@ -54,6 +57,7 @@ class HentaiWorld : MainAPI() {
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val document = app.get("${mainUrl}/search/${query}/page/$page").document
 
         val aramaCevap = document.select("article").mapNotNull { it.toSearchResult() }
@@ -71,6 +75,7 @@ class HentaiWorld : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val document = app.get(url).document
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
 
@@ -124,12 +129,12 @@ class HentaiWorld : MainAPI() {
     }
 
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val iframeUrl = Regex("""https://hentaiworld\.tv/video-player\.html\?videos/[^'"]+""")
             .find(app.get(data).text)?.value
             ?.replace("&lt;", "")?.replace("&gt;", "")?.trim() ?: return false
@@ -148,6 +153,7 @@ class HentaiWorld : MainAPI() {
             )
         )
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }

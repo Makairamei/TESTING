@@ -1,5 +1,7 @@
 package com.reelshort
 
+import com.reelshort.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
@@ -26,6 +28,7 @@ class Reelshort : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         if (page > 1) return newHomePageResponse(request.name, emptyList())
 
         val shelf = fetchShelfWithFallback(request.data)
@@ -37,6 +40,7 @@ class Reelshort : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val keyword = query.trim()
         if (keyword.isBlank()) return emptyList()
 
@@ -47,7 +51,8 @@ class Reelshort : MainAPI() {
             .distinctBy { it.url }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val bookId = extractBookId(url)
         if (bookId.isBlank()) throw ErrorLoadingException("ID tidak ditemukan")
 
@@ -112,12 +117,12 @@ class Reelshort : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val parsed = parseJson<LoadData>(data)
         val bookId = parsed.bookId ?: return false
         val episode = parsed.episode ?: return false
@@ -146,6 +151,7 @@ class Reelshort : MainAPI() {
                 this.referer = "$mainUrl/"
             }
         )
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 

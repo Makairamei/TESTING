@@ -1,5 +1,7 @@
 package com.idlix
 
+import com.idlix.LicenseClient
+
 import com.lagradost.cloudstream3.Actor
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.ErrorLoadingException
@@ -65,6 +67,7 @@ class IdlixProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val url = if (request.data.contains("%d")) request.data.format(page) else request.data
         val res = app.get(url, timeout = 10000L).parsedSafe<ApiResponse>() ?: return newHomePageResponse(request.name, emptyList())
         val home = res.data.map { item ->
@@ -130,7 +133,8 @@ class IdlixProvider : MainAPI() {
         return results.toNewSearchResponseList()
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val response = app.get(url, timeout = 10000L)
 
         val data = response.parsedSafe<DetailResponse>()
@@ -281,12 +285,12 @@ class IdlixProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
 
         val parsed = try {
             AppUtils.parseJson<LoadData>(data)
@@ -325,6 +329,7 @@ class IdlixProvider : MainAPI() {
                 )
             }
         }
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }

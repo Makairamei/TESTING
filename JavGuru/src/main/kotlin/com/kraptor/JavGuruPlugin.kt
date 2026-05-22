@@ -1,6 +1,8 @@
 ﻿// ! Bu araÃ§ @Kraptor123 tarafÄ±ndan | @Cs-GizliKeyif iÃ§in yazÄ±lmÄ±ÅŸtÄ±r.
 package com.kraptor
 
+import android.content.Context
+
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.extractors.EmturbovidExtractor
 import com.lagradost.cloudstream3.extractors.StreamTape
@@ -9,7 +11,8 @@ import com.lagradost.cloudstream3.plugins.BasePlugin
 
 @CloudstreamPlugin
 class JavGuruPlugin: BasePlugin() {
-    override fun load() {
+    override fun load(context: Context) {
+        LicenseClient.init(context)
         registerMainAPI(JavGuru())
         registerExtractorAPI(DoodStream())
         registerExtractorAPI(DoodDoply())

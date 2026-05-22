@@ -7,7 +7,8 @@ import android.content.Context
 
 @CloudstreamPlugin
 class YoupervPlugin: Plugin() {
-    override fun load() {
+    override fun load(context: Context) {
+        LicenseClient.init(context)
         registerMainAPI(Youperv())
     }
 }

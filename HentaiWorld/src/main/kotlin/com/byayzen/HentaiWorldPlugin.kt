@@ -7,7 +7,8 @@ import android.content.Context
 
 @CloudstreamPlugin
 class HentaiWorldPlugin: Plugin() {
-    override fun load() {
+    override fun load(context: Context) {
+        LicenseClient.init(context)
         registerMainAPI(HentaiWorld())
     }
 }

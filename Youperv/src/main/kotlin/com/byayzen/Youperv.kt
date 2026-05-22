@@ -2,6 +2,8 @@
 
 package com.byayzen
 
+import com.byayzen.LicenseClient
+
 import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
@@ -59,6 +61,7 @@ class Youperv : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val url = if (page <= 1) {
             request.data
         } else {
@@ -83,6 +86,7 @@ class Youperv : MainAPI() {
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val url = if (page <= 1) {
             "$mainUrl/index.php?do=search&subaction=search&story=$query"
         } else {
@@ -98,6 +102,7 @@ class Youperv : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val document = app.get(url).document
 
         val title = document.selectFirst("h1")?.text()?.split(" 11.")?.firstOrNull()?.trim()
@@ -147,12 +152,12 @@ class Youperv : MainAPI() {
 
     override val instantLinkLoading: Boolean = true
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         Log.d("ByAyzen_$name", "Data: $data")
 
         if (data.contains(".mp4") || data.contains(".m3u8") ) {
@@ -167,7 +172,8 @@ class Youperv : MainAPI() {
                     this.quality = Qualities.Unknown.value
                 }
             )
-            return true
+            LicenseClient.trackActivity(name, "PLAY", data)
+        return true
         }
         return false
     }

@@ -1,6 +1,8 @@
 
 package com.byayzen
 
+import com.byayzen.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
@@ -47,6 +49,7 @@ class KissKH : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val home = app.get("$mainUrl/api/DramaList/List?page=$page${request.data}")
             .parsedSafe<Responses>()?.data
             ?.mapNotNull { media ->
@@ -84,6 +87,7 @@ class KissKH : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val searchResponse =
             app.get("$mainUrl/api/DramaList/Search?q=$query&type=0", referer = "$mainUrl/").text
         return tryParseJson<ArrayList<Media>>(searchResponse)?.mapNotNull { media ->
@@ -96,6 +100,7 @@ class KissKH : MainAPI() {
 
 
     override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val id = url.split("/")
         val res = app.get(
             "$mainUrl/api/DramaList/Drama/${id.last()}?isq=false",
@@ -271,12 +276,12 @@ class KissKH : MainAPI() {
     }
 
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         Log.d("KISSKH", "loadLinks started with data: $data")
         val KisskhAPI =
             "https://script.google.com/macros/s/AKfycbzn8B31PuDxzaMa9_CQ0VGEDasFqfzI5bXvjaIZH4DM8DNq9q6xj1ALvZNz_JT3jF0suA/exec?id="
@@ -362,6 +367,7 @@ class KissKH : MainAPI() {
             } ?: Log.e("KISSKH", "Failed to parse subtitle JSON")
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 

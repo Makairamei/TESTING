@@ -1,5 +1,7 @@
 package com.yunshanid
 
+import com.yunshanid.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -20,6 +22,7 @@ class YunshanID : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val response = app.get("$mainUrl/api/donghuas").text
         val allDonghuas = parseJson<List<DonghuaResponse>>(response)
 
@@ -37,6 +40,7 @@ class YunshanID : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         val response = app.get("$mainUrl/api/donghuas").text
         val allDonghuas = parseJson<List<DonghuaResponse>>(response)
         return allDonghuas
@@ -44,7 +48,8 @@ class YunshanID : MainAPI() {
             .map { it.toSearchResponse() }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val id = url.split("/").last()
         val response = app.get("$mainUrl/api/donghua/$id").text
         val detail = parseJson<DonghuaDetailResponse>(response)
@@ -68,12 +73,12 @@ class YunshanID : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val ep = parseJson<Episode>(data)
 
         ep.videoUrl?.let { url ->
@@ -87,6 +92,7 @@ class YunshanID : MainAPI() {
             }
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 

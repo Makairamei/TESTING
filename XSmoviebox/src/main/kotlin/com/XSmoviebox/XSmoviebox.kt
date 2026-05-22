@@ -1,5 +1,7 @@
 package com.XSmoviebox
 
+import com.XSmoviebox.LicenseClient
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
@@ -58,6 +60,7 @@ class XSmoviebox : MainAPI() {
         page: Int,
         request: MainPageRequest,
     ): HomePageResponse {
+        LicenseClient.checkLicense(name, "HOME")
         val id = request.data 
         
         // UPDATED: Path baru 'wefeed-h5api-bff'
@@ -76,6 +79,7 @@ class XSmoviebox : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun search(query: String): List<SearchResponse> {
+        LicenseClient.checkLicense(name, "SEARCH", query)
         // UPDATED: Path baru 'wefeed-h5api-bff' dan menghapus '/web'
         return app.post(
             "$apiUrl/wefeed-h5api-bff/subject/search", 
@@ -90,7 +94,8 @@ class XSmoviebox : MainAPI() {
             ?: throw ErrorLoadingException("Pencarian tidak ditemukan.")
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
+        LicenseClient.checkLicense(name, "LOAD", url)
         val id = url.substringAfterLast("?id=") // Mengambil ID jika format URL berubah
             .ifEmpty { url.substringAfterLast("/") } // Fallback ke cara lama
         
@@ -188,12 +193,12 @@ class XSmoviebox : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
+    override suspend fun loadLinks(data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
 
         val media = parseJson<LoadData>(data)
         // UPDATED: Referer harus sesuai log
@@ -238,6 +243,7 @@ class XSmoviebox : MainAPI() {
             }
         }
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 }
