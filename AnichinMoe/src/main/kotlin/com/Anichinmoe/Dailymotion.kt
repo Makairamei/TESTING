@@ -4,7 +4,9 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.M3u8Helper.Companion.generateM3u8
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import java.net.URI
 
 class Geodailymotion : Dailymotion() {
@@ -30,15 +32,21 @@ open class Dailymotion : ExtractorApi() {
         val id = getVideoId(embedUrl) ?: return
         val metaDataUrl = "$baseUrl/player/metadata/video/$id"
         val response = app.get(metaDataUrl, referer = embedUrl).text
-        val qualityUrlRegex = Regex(""""url"\s*:\s*"([^"]+)"""")
         val subtitlesRegex = Regex(""""subtitles"\s*:\s*\{[^}]*"data"\s*:\s*(\[[^\]]*\])""")
 
-        val urls = qualityUrlRegex.findAll(response)
-            .map { it.groupValues[1] }
-            .toList().filter { it.contains(".m3u8") }
+        // Extract ONLY the master playlist URL from "auto" quality.
+        // Other quality keys (240,480,720,...) point to per-variant playlists
+        // that are video-only. The "auto" key is the master that contains
+        // both video variants and the audio rendition group.
+        val autoRegex = Regex(""""auto"\s*:\s*\[\s*\{[^}]*"url"\s*:\s*"([^"]+)"""")
+        val urls = autoRegex.findAll(response)
+            .map { it.groupValues[1].replace("\\/", "/") }
+            .filter { it.contains(".m3u8") && !it.contains("dmxleo.") }
+            .distinct()
+            .toList()
 
         urls.forEach { videoUrl ->
-            getStream(videoUrl, this.name, callback)
+            getStream(videoUrl, embedUrl, this.name, callback)
         }
 
         val subtitlesMatches = subtitlesRegex.findAll(response).map { it.groupValues[1] }.toList()
@@ -69,9 +77,28 @@ open class Dailymotion : ExtractorApi() {
 
     private suspend fun getStream(
         streamLink: String,
+        embedUrl: String,
         name: String,
         callback: (ExtractorLink) -> Unit
     ) {
-        return generateM3u8(name, streamLink, "").forEach(callback)
+        // Pass MASTER playlist URL directly to ExoPlayer (M3U8 type).
+        // Dailymotion CDN requires Referer/Origin/User-Agent or returns 403.
+        val ua = "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+        callback.invoke(
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = streamLink,
+                type = ExtractorLinkType.M3U8
+            ) {
+                this.referer = embedUrl
+                this.quality = Qualities.Unknown.value
+                this.headers = mapOf(
+                    "Referer" to embedUrl,
+                    "Origin" to baseUrl,
+                    "User-Agent" to ua
+                )
+            }
+        )
     }
 }
