@@ -54,13 +54,7 @@ jobs:
           mkdir -p builds
 
           # List all plugin directories (with build.gradle.kts)
-          PLUGINS=()
-          for dir in */; do
-            dir="${dir%/}"
-            [ "$dir" = "buildSrc" ] && continue
-            [ -f "$dir/build.gradle.kts" ] || continue
-            PLUGINS+=("$dir")
-          done
+          PLUGINS=("KuronimeProvider" "AnimeSailProvider" "Samehadaku" "AnichinMoe")
 
           echo "Total plugins to build: ${#PLUGINS[@]}"
           ok=0; fail=0
