@@ -24,12 +24,18 @@ object AnimeSailLicenseClient {
     private val actionThrottle = mutableMapOf<String, Long>()
     private var licenseBlocked = false
     private var blockMessage = ""
+    private var defaultPluginName: String = "AnimeSail"
+    private var pluginName: String = "AnimeSail"
     private var appContext: Context? = null
     private var pluginSessionToken: String? = null
     private var pluginSessionPlugin: String? = null
     private var pluginSessionExpiry: Long = 0L
 
-    fun init(context: Context) { appContext = context.applicationContext }
+    fun init(context: Context, name: String = "AnimeSail") { 
+        appContext = context.applicationContext 
+        pluginName = name
+        defaultPluginName = name
+    }
 
     fun setLicenseKey(context: Context, key: String) {
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit().putString(PREF_KEY, key.trim()).apply()

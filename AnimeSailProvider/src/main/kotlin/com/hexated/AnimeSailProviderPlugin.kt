@@ -8,7 +8,7 @@ import android.content.Context
 @CloudstreamPlugin
 class AnimeSailProviderPlugin: Plugin() {
     override fun load(context: Context) {
-        AnimeSailLicenseClient.init(context)
+        AnimeSailLicenseClient.init(context, "AnimeSail")
         registerMainAPI(AnimeSailProvider())
         registerExtractorAPI(MixDropBz())
         registerExtractorAPI(Mp4UploadFix())

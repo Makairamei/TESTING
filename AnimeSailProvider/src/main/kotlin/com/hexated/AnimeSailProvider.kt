@@ -1,4 +1,4 @@
-﻿package com.hexated
+package com.hexated
 
 import android.annotation.SuppressLint
 import android.os.Handler
@@ -157,6 +157,7 @@ class AnimeSailProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        AnimeSailLicenseClient.trackActivity(name, "SEARCH", query)
         val link = "$mainUrl/?s=$query"
         val document = request(link).document
 
@@ -166,6 +167,7 @@ class AnimeSailProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        AnimeSailLicenseClient.trackActivity(name, "LOAD", url)
         val document = request(url).document
 
         val title = document.selectFirst("h1.entry-title")?.text().toString()
@@ -477,6 +479,7 @@ class AnimeSailProvider : MainAPI() {
         refererHint: String?,
         callback: (ExtractorLink) -> Unit
     ) {
+        AnimeSailLicenseClient.trackActivity(name, "PLAY", mediaUrl)
         val isMp4UploadDirect = mediaUrl.contains("mp4upload.com", ignoreCase = true)
         val directReferer = if (isMp4UploadDirect) "https://www.mp4upload.com/" else (refererHint ?: mainUrl)
         val directHeaders = if (isMp4UploadDirect) {
@@ -527,6 +530,7 @@ class AnimeSailProvider : MainAPI() {
                 if (serverName.equals(link.name, ignoreCase = true)) link.name else "$serverName - ${link.name}"
 
             runBlocking {
+                AnimeSailLicenseClient.trackActivity(name, "PLAY", link.url)
                 callback.invoke(
                     newExtractorLink(
                         source = link.name,
