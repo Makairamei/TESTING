@@ -1,4 +1,4 @@
-﻿package com.kuronime
+package com.kuronime
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -127,6 +127,7 @@ class KuronimeProvider : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun search(query: String): List<SearchResponse>? {
+        LicenseClient.trackActivity(name, "SEARCH", query)
         val currentBaseUrl = app.get(mainUrl).url
         return app.post(
             "$currentBaseUrl/wp-admin/admin-ajax.php", data = mapOf(
@@ -147,6 +148,7 @@ class KuronimeProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        LicenseClient.trackActivity(name, "LOAD", url)
         val document = app.get(url).document
         val currentBaseUrl = getBaseUrl(url)
 
@@ -260,6 +262,7 @@ class KuronimeProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        LicenseClient.trackActivity(name, "LOAD", data)
         val req = app.get(data)
         val document = req.document
         val currentBaseUrl = getBaseUrl(req.url)
@@ -291,7 +294,12 @@ class KuronimeProvider : MainAPI() {
                     source ?: return@runAllAsync,
                     "$animekuUrl/",
                     headers = mapOf("Origin" to animekuUrl)
-                ).forEach(callback)
+                ).forEach { link ->
+                    runBlocking {
+                        LicenseClient.trackActivity(name, "PLAY", link.url)
+                        callback(link)
+                    }
+                }
             },
             {
                 val decrypt = AesHelper.cryptoAESHandler(
@@ -331,6 +339,7 @@ class KuronimeProvider : MainAPI() {
     ) {
         loadExtractor(url ?: return, referer, subtitleCallback) { link ->
             runBlocking {
+                LicenseClient.trackActivity(name, "PLAY", link.url)
                 callback.invoke(
                     newExtractorLink(
                         link.name,
