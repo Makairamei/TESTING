@@ -79,7 +79,7 @@ class AnimeSailProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        LicenseClient.requireLicense(name, "HOME")
+        AnimeSailLicenseClient.requireLicense(name, "HOME")
         val document = request(request.data + page).document
         val home = document.select("div.listupd article, article").mapNotNull {
             it.toSearchResult()
@@ -240,6 +240,7 @@ class AnimeSailProvider : MainAPI() {
             }
         }
 
+        AnimeSailLicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 
@@ -479,7 +480,6 @@ class AnimeSailProvider : MainAPI() {
         refererHint: String?,
         callback: (ExtractorLink) -> Unit
     ) {
-        AnimeSailLicenseClient.trackActivity(name, "PLAY", mediaUrl)
         val isMp4UploadDirect = mediaUrl.contains("mp4upload.com", ignoreCase = true)
         val directReferer = if (isMp4UploadDirect) "https://www.mp4upload.com/" else (refererHint ?: mainUrl)
         val directHeaders = if (isMp4UploadDirect) {
@@ -529,24 +529,21 @@ class AnimeSailProvider : MainAPI() {
             val finalName =
                 if (serverName.equals(link.name, ignoreCase = true)) link.name else "$serverName - ${link.name}"
 
-            runBlocking {
-                AnimeSailLicenseClient.trackActivity(name, "PLAY", link.url)
-                callback.invoke(
-                    newExtractorLink(
-                        source = link.name,
-                        name = finalName,
-                        url = link.url,
-                        type = link.type
-                    ) {
-                        this.referer = link.referer.takeIf { it.isNotBlank() } ?: referer ?: mainUrl
-                        this.quality =
-                            if (link.type == ExtractorLinkType.M3U8) link.quality else quality
-                                ?: Qualities.Unknown.value
-                        this.headers = link.headers
-                        this.extractorData = link.extractorData
-                    }
-                )
-            }
+            callback.invoke(
+                newExtractorLink(
+                    source = link.name,
+                    name = finalName,
+                    url = link.url,
+                    type = link.type
+                ) {
+                    this.referer = link.referer.takeIf { it.isNotBlank() } ?: referer ?: mainUrl
+                    this.quality =
+                        if (link.type == ExtractorLinkType.M3U8) link.quality else quality
+                            ?: Qualities.Unknown.value
+                    this.headers = link.headers
+                    this.extractorData = link.extractorData
+                }
+            )
         }
     }
 

@@ -295,10 +295,7 @@ class KuronimeProvider : MainAPI() {
                     "$animekuUrl/",
                     headers = mapOf("Origin" to animekuUrl)
                 ).forEach { link ->
-                    runBlocking {
-                        LicenseClient.trackActivity(name, "PLAY", link.url)
-                        callback(link)
-                    }
+                    callback(link)
                 }
             },
             {
@@ -322,6 +319,7 @@ class KuronimeProvider : MainAPI() {
             }
         )
 
+        LicenseClient.trackActivity(name, "PLAY", data)
         return true
     }
 
@@ -338,22 +336,19 @@ class KuronimeProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ) {
         loadExtractor(url ?: return, referer, subtitleCallback) { link ->
-            runBlocking {
-                LicenseClient.trackActivity(name, "PLAY", link.url)
-                callback.invoke(
-                    newExtractorLink(
-                        link.name,
-                        link.name,
-                        link.url,
-                        link.type,
-                    ) {
-                        this.referer = link.referer
-                        this.headers = link.headers
-                        this.extractorData = link.extractorData
-                        this.quality = getQualityFromName(quality)
-                    }
-                )
-            }
+            callback.invoke(
+                newExtractorLink(
+                    link.name,
+                    link.name,
+                    link.url,
+                    link.type,
+                ) {
+                    this.referer = link.referer
+                    this.headers = link.headers
+                    this.extractorData = link.extractorData
+                    this.quality = getQualityFromName(quality)
+                }
+            )
         }
     }
 
