@@ -148,7 +148,7 @@ class KuronimeProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        LicenseClient.trackActivity(name, "LOAD", url)
+        LicenseClient.requireLicense(name, "LOAD", url)
         val document = app.get(url).document
         val currentBaseUrl = getBaseUrl(url)
 
@@ -262,7 +262,6 @@ class KuronimeProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        LicenseClient.trackActivity(name, "LOAD", data)
         val req = app.get(data)
         val document = req.document
         val currentBaseUrl = getBaseUrl(req.url)
