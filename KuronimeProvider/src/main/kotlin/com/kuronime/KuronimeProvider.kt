@@ -304,7 +304,7 @@ class KuronimeProvider : MainAPI() {
                     false,
                     "AES/CBC/NoPadding"
                 )
-                tryParseJson<Mirrors>(decrypt)?.embed?.map { embed ->
+                tryParseJson<Mirrors>(decrypt?.toJsonFormat())?.embed?.map { embed ->
                     embed.value.forEach { entry ->
                         loadFixedExtractor(
                             entry.value,
