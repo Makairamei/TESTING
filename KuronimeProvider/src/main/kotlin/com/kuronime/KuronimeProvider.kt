@@ -278,20 +278,20 @@ class KuronimeProvider : MainAPI() {
         val playerPath = "$currentBaseUrl/utils/player/"
 
         // 1. Try parsing JSON API sources from animeku.org
-        // Search multiple script patterns for the episode ID
+        // Prioritize script containing the dynamic _0xa100d42aa ID
         val scriptData = document.select("script").map { it.data() }
-            .firstOrNull {
-                it.contains("_0xa100d42aa") ||
-                it.contains("is_singular") ||
-                it.contains("postID")
-            }
+            .firstOrNull { it.contains("_0xa100d42aa") }
+            ?: document.select("script").map { it.data() }
+                .firstOrNull { it.contains("postID") || it.contains("is_singular") }
 
-        val id = scriptData
-            ?.let {
+        val id = scriptData?.let {
+            if (it.contains("_0xa100d42aa = \"")) {
                 it.substringAfter("_0xa100d42aa = \"", "").substringBefore("\";")
-                    .takeIf { v -> v.isNotBlank() }
-                    ?: it.substringAfter("\"postID\":\"", "").substringBefore("\"").takeIf { v -> v.isNotBlank() }
+            } else {
+                Regex("""(?:"postID"\s*:\s*"?|var\s+post_id\s*=\s*"?|postID\s*=\s*"?)([A-Za-z0-9_-]+)""").find(it)
+                    ?.groupValues?.getOrNull(1)
             }
+        }
 
         if (!id.isNullOrBlank()) {
             val servers = safeApiCall {
@@ -321,8 +321,7 @@ class KuronimeProvider : MainAPI() {
                         ).forEach { link -> callback(link) }
                     },
                     {
-                        // Handle mirror/embed providers — FIX: parse decrypt directly (no .toJsonFormat())
-                        // Using .toJsonFormat() strips the outer JSON braces causing parse failure
+                        // Handle mirror/embed providers
                         val rawDecrypt = AesHelper.cryptoAESHandler(
                             base64Decode(servers.mirror ?: return@runAllAsync),
                             KEY.toByteArray(),
@@ -330,16 +329,34 @@ class KuronimeProvider : MainAPI() {
                             "AES/CBC/NoPadding"
                         ) ?: return@runAllAsync
 
-                        // Try direct parse first (like CS01.1), fallback to toJsonFormat
                         val mirrors = tryParseJson<Mirrors>(rawDecrypt)
                             ?: tryParseJson<Mirrors>(rawDecrypt.toJsonFormat())
 
-                        mirrors?.embed?.map { embed ->
-                            embed.value.amap { entry ->
+                        mirrors?.embed?.forEach { embed ->
+                            embed.value.entries.amap { entry ->
+                                val url = entry.value ?: return@amap
                                 val quality = getIndexQuality(embed.key.removePrefix("v"))
                                 val serverName = entry.key
                                 resolveMirrorLink(
-                                    rawUrl = entry.value,
+                                    rawUrl = url,
+                                    referer = "$currentBaseUrl/",
+                                    playerPath = playerPath,
+                                    serverName = serverName,
+                                    quality = quality,
+                                    visitedUrls = visitedUrls,
+                                    subtitleCallback = subtitleCallback,
+                                    callback = callback
+                                )
+                            }
+                        }
+
+                        mirrors?.download?.forEach { download ->
+                            download.value.entries.amap { entry ->
+                                val url = entry.value ?: return@amap
+                                val quality = getIndexQuality(download.key.removePrefix("v"))
+                                val serverName = "${entry.key} (DL)"
+                                resolveMirrorLink(
+                                    rawUrl = url,
                                     referer = "$currentBaseUrl/",
                                     playerPath = playerPath,
                                     serverName = serverName,
@@ -1126,7 +1143,8 @@ class KuronimeProvider : MainAPI() {
     }
 
     data class Mirrors(
-        @JsonProperty("embed") val embed: Map<String, Map<String, String>> = emptyMap(),
+        @JsonProperty("embed") val embed: Map<String, Map<String, String?>> = emptyMap(),
+        @JsonProperty("download") val download: Map<String, Map<String, String?>> = emptyMap(),
     )
 
     data class Sources(

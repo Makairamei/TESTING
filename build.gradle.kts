@@ -20,7 +20,7 @@ buildscript {
 
         // CloudStream Gradle Plugin
         classpath(
-            "com.github.recloudstream:gradle:master-SNAPSHOT"
+            "com.github.recloudstream:gradle:81b1d424d2"
         )
 
         // Kotlin
