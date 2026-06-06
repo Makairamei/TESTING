@@ -606,7 +606,20 @@ class KuronimeProvider : MainAPI() {
     }
 
     private fun normalizeMirrorUrl(raw: String?): String? {
-        return normalizeUrlFromBase(raw, mainUrl)
+        val url = normalizeUrlFromBase(raw, mainUrl) ?: return null
+        var normalized = url
+        if (normalized.contains("dsvplay.com", ignoreCase = true) || 
+            normalized.contains("ds2play.com", ignoreCase = true) ||
+            normalized.contains("doodstream.co", ignoreCase = true)
+        ) {
+            normalized = normalized.replace(Regex("(?i)(dsvplay\\.com|ds2play\\.com|doodstream\\.co)"), "dood.to")
+        }
+        if (normalized.contains("vidhidevip.com", ignoreCase = true) ||
+            normalized.contains("vidhide.com", ignoreCase = true)
+        ) {
+            normalized = normalized.replace(Regex("(?i)(vidhidevip\\.com|vidhide\\.com)"), "vidhidepro.com")
+        }
+        return normalized
     }
 
     private fun normalizeUrlFromBase(raw: String?, baseUrl: String?): String? {
@@ -747,7 +760,8 @@ class KuronimeProvider : MainAPI() {
         return lower.contains("pixeldrain.com") ||
             lower.contains("pompom") ||
             lower.contains("pancal") ||
-            lower.contains("myvidplay.com")
+            lower.contains("myvidplay.com") ||
+            lower.contains("krakenfiles.com")
     }
 
     private fun isCustomManagedServer(serverName: String): Boolean {
@@ -779,6 +793,9 @@ class KuronimeProvider : MainAPI() {
                 tryPassMd5PatternDirect(url, serverName, quality, referer, callback) ||
                     tryMirrorCrawlerExtractor(url, serverName, quality, referer, callback)
             }
+            lower.contains("krakenfiles.com") -> {
+                tryKrakenfilesDirect(url, serverName, quality, referer, callback)
+            }
             isCustomManagedServer(serverName) -> {
                 tryPassMd5PatternDirect(url, serverName, quality, referer, callback) ||
                     tryMirrorCrawlerExtractor(url, serverName, quality, referer, callback)
@@ -802,21 +819,6 @@ class KuronimeProvider : MainAPI() {
 
         val directUrl = "https://pixeldrain.com/api/file/$id?download"
         val pixeldrainReferer = "https://pixeldrain.com/"
-        val probe = runCatching {
-            app.get(
-                directUrl,
-                referer = pixeldrainReferer,
-                headers = mapOf(
-                    "User-Agent" to USER_AGENT,
-                    "Referer" to pixeldrainReferer,
-                    "Origin" to "https://pixeldrain.com",
-                    "Range" to "bytes=0-1023"
-                )
-            )
-        }.getOrNull() ?: return false
-
-        val contentType = (probe.headers["Content-Type"] ?: probe.headers["content-type"]).orEmpty().lowercase()
-        if (contentType.contains("text/html")) return false
 
         callback.invoke(
             newExtractorLink(
@@ -831,6 +833,47 @@ class KuronimeProvider : MainAPI() {
                     "User-Agent" to USER_AGENT,
                     "Referer" to pixeldrainReferer,
                     "Origin" to "https://pixeldrain.com"
+                )
+            }
+        )
+        return true
+    }
+
+    private suspend fun tryKrakenfilesDirect(
+        url: String,
+        serverName: String,
+        quality: Int?,
+        referer: String?,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val id = Regex("""krakenfiles\.com/(?:embed-video|view)/([A-Za-z0-9_-]+)""", RegexOption.IGNORE_CASE)
+            .find(url)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: return false
+            
+        val embedUrl = "https://krakenfiles.com/embed-video/$id"
+        val response = runCatching { app.get(embedUrl, referer = referer) }.getOrNull() ?: return false
+        val document = response.document
+        val streamUrl = document.selectFirst("video#myVideo > source")?.attr("src")
+            ?: document.selectFirst("video source")?.attr("src")
+            ?: return false
+            
+        val absoluteUrl = normalizeUrlFromBase(streamUrl, embedUrl) ?: return false
+        val krakenReferer = "https://krakenfiles.com/"
+        
+        callback.invoke(
+            newExtractorLink(
+                source = "Krakenfiles",
+                name = serverName,
+                url = absoluteUrl,
+                type = ExtractorLinkType.VIDEO
+            ) {
+                this.referer = krakenReferer
+                this.quality = quality ?: Qualities.Unknown.value
+                this.headers = mapOf(
+                    "User-Agent" to USER_AGENT,
+                    "Referer" to krakenReferer
                 )
             }
         )
@@ -1054,28 +1097,12 @@ class KuronimeProvider : MainAPI() {
             else -> return false
         }
 
-        val probe = runCatching {
-            app.get(
-                finalUrl,
-                referer = watchReferer,
-                headers = mapOf(
-                    "User-Agent" to USER_AGENT,
-                    "Referer" to watchReferer,
-                    "Origin" to "https://www.mp4upload.com",
-                    "Range" to "bytes=0-4095"
-                )
-            )
-        }.getOrNull() ?: return false
-
-        val contentType = (probe.headers["Content-Type"] ?: probe.headers["content-type"]).orEmpty().lowercase()
-        if (!(contentType.contains("octet-stream") || contentType.contains("video"))) return false
-
         callback.invoke(
             newExtractorLink(
                 source = "Mp4Upload",
                 name = serverName,
                 url = finalUrl,
-                type = INFER_TYPE
+                type = ExtractorLinkType.VIDEO
             ) {
                 this.referer = watchReferer
                 this.quality = quality ?: Qualities.Unknown.value
