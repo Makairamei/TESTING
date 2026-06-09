@@ -283,6 +283,7 @@ class KuronimeProvider : MainAPI() {
             .firstOrNull { it.contains("_0xa100d42aa") }
             ?: document.select("script").map { it.data() }
                 .firstOrNull { it.contains("postID") || it.contains("is_singular") }
+            ?: document.selectFirst("div#content script:containsData(is_singular)")?.data()
 
         val id = scriptData?.let {
             if (it.contains("_0xa100d42aa = \"")) {
@@ -718,8 +719,7 @@ class KuronimeProvider : MainAPI() {
     ) {
         val normalizedUrl = normalizeYourUploadUrl(url)
         if (isCustomManagedHost(normalizedUrl) || isCustomManagedServer(serverName)) {
-            tryCustomLocalExtractor(normalizedUrl, serverName, quality, referer, callback)
-            return
+            if (tryCustomLocalExtractor(normalizedUrl, serverName, quality, referer, callback)) return
         }
         if (tryCustomLocalExtractor(normalizedUrl, serverName, quality, referer, callback)) return
         if (tryLoadMp4UploadDirect(normalizedUrl, serverName, quality, callback)) return
